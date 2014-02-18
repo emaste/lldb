@@ -414,7 +414,7 @@ ClangASTType::GetNumberOfFunctionArguments () const
         QualType qual_type (GetCanonicalQualType());
         const FunctionProtoType* func = dyn_cast<FunctionProtoType>(qual_type.getTypePtr());
         if (func)
-            return func->getNumParams();
+            return func->getNumArgs();
     }
     return 0;
 }
@@ -428,8 +428,8 @@ ClangASTType::GetFunctionArgumentAtIndex (const size_t index)
         const FunctionProtoType* func = dyn_cast<FunctionProtoType>(qual_type.getTypePtr());
         if (func)
         {
-            if (index < func->getNumParams())
-                return ClangASTType(m_ast, func->getParamType(index).getAsOpaquePtr());
+            if (index < func->getNumArgs())
+                return ClangASTType(m_ast, func->getArgType(index).getAsOpaquePtr());
         }
     }
     return ClangASTType();
@@ -1596,7 +1596,7 @@ ClangASTType::GetFunctionArgumentCount () const
     {
         const FunctionProtoType* func = dyn_cast<FunctionProtoType>(GetCanonicalQualType());
         if (func)
-            return func->getNumParams();
+            return func->getNumArgs();
     }
     return -1;
 }
@@ -1609,9 +1609,9 @@ ClangASTType::GetFunctionArgumentTypeAtIndex (size_t idx)
         const FunctionProtoType* func = dyn_cast<FunctionProtoType>(GetCanonicalQualType());
         if (func)
         {
-            const uint32_t num_args = func->getNumParams();
+            const uint32_t num_args = func->getNumArgs();
             if (idx < num_args)
-                return ClangASTType(m_ast, func->getParamType(idx));
+                return ClangASTType(m_ast, func->getArgType(idx));
         }
     }
     return ClangASTType();
@@ -4632,7 +4632,7 @@ ClangASTType::AddMethodToCXXRecordType (const char *name,
     if (!method_function_prototype)
         return NULL;
     
-    unsigned int num_params = method_function_prototype->getNumParams();
+    unsigned int num_params = method_function_prototype->getNumArgs();
     
     CXXDestructorDecl *cxx_dtor_decl(NULL);
     CXXConstructorDecl *cxx_ctor_decl(NULL);
@@ -4745,7 +4745,7 @@ ClangASTType::AddMethodToCXXRecordType (const char *name,
                                                SourceLocation(),
                                                SourceLocation(),
                                                NULL, // anonymous
-                                               method_function_prototype->getParamType(param_index),
+                                               method_function_prototype->getArgType(param_index),
                                                NULL,
                                                SC_None,
                                                NULL));
@@ -5118,7 +5118,7 @@ ClangASTType::AddMethodToObjCObjectType (const char *name,  // the full symbol n
     bool is_defined = false;
     ObjCMethodDecl::ImplementationControl imp_control = ObjCMethodDecl::None;
     
-    const unsigned num_args = method_function_prototype->getNumParams();
+    const unsigned num_args = method_function_prototype->getNumArgs();
     
     if (num_args != num_selectors_with_args)
         return NULL; // some debug information is corrupt.  We are not going to deal with it.
@@ -5153,7 +5153,7 @@ ClangASTType::AddMethodToObjCObjectType (const char *name,  // the full symbol n
                                                    SourceLocation(),
                                                    SourceLocation(),
                                                    NULL, // anonymous
-                                                   method_function_prototype->getParamType(param_index),
+                                                   method_function_prototype->getArgType(param_index),
                                                    NULL,
                                                    SC_Auto,
                                                    NULL));
