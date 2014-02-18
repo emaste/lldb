@@ -1625,7 +1625,7 @@ ClangASTType::GetFunctionReturnType () const
         QualType qual_type(GetCanonicalQualType());
         const FunctionProtoType* func = dyn_cast<FunctionProtoType>(qual_type.getTypePtr());
         if (func)
-            return ClangASTType(m_ast, func->getReturnType());
+            return ClangASTType(m_ast, func->getResultType());
     }
     return ClangASTType();
 }
@@ -4699,7 +4699,7 @@ ClangASTType::AddMethodToCXXRecordType (const char *name,
                 cxx_method_decl = CXXConversionDecl::Create (*m_ast,
                                                              cxx_record_decl,
                                                              SourceLocation(),
-                                                             DeclarationNameInfo (m_ast->DeclarationNames.getCXXConversionFunctionName (m_ast->getCanonicalType (function_type->getReturnType())), SourceLocation()),
+                                                             DeclarationNameInfo (m_ast->DeclarationNames.getCXXConversionFunctionName (m_ast->getCanonicalType (function_type->getResultType())), SourceLocation()),
                                                              method_qual_type,
                                                              NULL, // TypeSourceInfo *
                                                              is_inline,
@@ -5127,7 +5127,7 @@ ClangASTType::AddMethodToObjCObjectType (const char *name,  // the full symbol n
                                                                SourceLocation(), // beginLoc,
                                                                SourceLocation(), // endLoc,
                                                                method_selector,
-                                                               method_function_prototype->getReturnType(),
+                                                               method_function_prototype->getResultType(),
                                                                NULL, // TypeSourceInfo *ResultTInfo,
                                                                GetDeclContextForType (),
                                                                name[0] == '-',
