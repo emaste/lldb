@@ -122,6 +122,8 @@ class   ModuleSpec;
 class   ModuleSpecList;
 class   Mutex;
 struct  NameSearchContext;
+class   NativeProcessProtocol;
+class   NativeThreadProtocol;
 class   ObjCLanguageRuntime;
 class   ObjectContainer;
 class   OptionGroup;
@@ -315,6 +317,8 @@ namespace lldb {
     typedef std::shared_ptr<lldb_private::LogChannel> LogChannelSP;
     typedef std::shared_ptr<lldb_private::Module> ModuleSP;
     typedef std::weak_ptr<lldb_private::Module> ModuleWP;
+    typedef std::shared_ptr<lldb_private::NativeProcessProtocol> NativeProcessProtocolSP;
+    typedef std::shared_ptr<lldb_private::NativeThreadProtocol> NativeThreadProtocolSP;
     typedef std::shared_ptr<lldb_private::ObjectFile> ObjectFileSP;
     typedef std::weak_ptr<lldb_private::ObjectFile> ObjectFileWP;
     typedef std::shared_ptr<lldb_private::ObjectFileJITDelegate> ObjectFileJITDelegateSP;

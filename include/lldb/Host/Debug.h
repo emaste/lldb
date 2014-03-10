@@ -11,6 +11,7 @@
 #define liblldb_Debug_h_
 
 #include "lldb/lldb-private.h"
+#include "lldb/Core/Broadcaster.h"
 #include "lldb/Core/Error.h"
 #include "lldb/Core/StreamString.h"
 #include "lldb/Host/Mutex.h"
@@ -244,9 +245,16 @@ namespace lldb_private {
     //------------------------------------------------------------------
     // NativeProcessProtocol
     //------------------------------------------------------------------
-    class NativeProcessProtocol {
+    class NativeProcessProtocol : public Broadcaster {
     public:
-        
+
+        enum class EventType
+        {
+            ProcessMessage = (1u << 0),
+            NewThread = (1u << 1),
+            ThreadStopped = (1u << 2)
+        };
+
         static NativeProcessProtocol *
         CreateInstance (lldb::pid_t pid);
 
@@ -254,7 +262,8 @@ namespace lldb_private {
         // then the process should be attached to. When attaching to a process
         // lldb_private::Host calls should be used to locate the process to attach to,
         // and then this function should be called.
-        NativeProcessProtocol (lldb::pid_t pid) :
+        NativeProcessProtocol (lldb::pid_t pid, lldb_private::BroadcasterManager *broadcaster_manager) :
+            Broadcaster(broadcaster_manager, "lldb.native-process-protocol"),
             m_pid (pid),
             m_threads(),
             m_threads_mutex (Mutex::eMutexTypeRecursive),
