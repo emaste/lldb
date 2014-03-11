@@ -9,6 +9,8 @@
 
 #include "lldb/lldb-python.h"
 
+#include "NativeProcessLinux.h"
+
 // C Includes
 #include <errno.h>
 #include <poll.h>
@@ -34,10 +36,9 @@
 #include "lldb/Target/RegisterContext.h"
 #include "lldb/Utility/PseudoTerminal.h"
 
+#include "LinuxSignals.h"
 #include "POSIXThread.h"
-// #include "ProcessLinux.h"
 #include "ProcessPOSIXLog.h"
-#include "NativeProcessLinux.h"
 
 #define DEBUG_PTRACE_MAXBYTES 20
 
@@ -71,7 +72,19 @@
 // fall back on kill() if tgkill isn't available
 #define tgkill(pid, tid, sig)  syscall(SYS_tgkill, pid, tid, sig)
 
+// Private bits we only need internally.
+namespace _NativeProcessLinux_impl
+{
+    static const lldb_private::UnixSignals&
+    GetUnixSignals ()
+    {
+        static LinuxSignals signals;
+        return signals;
+    }
+}
+
 using namespace lldb_private;
+using namespace _NativeProcessLinux_impl;
 
 // FIXME: this code is host-dependent with respect to types and
 // endianness and needs to be fixed.  For example, lldb::addr_t is
@@ -989,6 +1002,110 @@ NativeProcessLinux::AttachArgs::AttachArgs(NativeProcessLinux *monitor,
 NativeProcessLinux::AttachArgs::~AttachArgs()
 { }
 
+// -----------------------------------------------------------------------------
+// Public Static Methods
+// -----------------------------------------------------------------------------
+
+lldb_private::Error
+NativeProcessLinux::LaunchProcess (
+    BroadcasterManager *broadcaster_manager,
+    lldb_private::Module *exe_module,
+    lldb_private::ProcessLaunchInfo &launch_info,
+    lldb::NativeProcessProtocolSP &native_process_sp)
+{
+    Error error;
+
+    // Verify the working directory is valid if one was specified.
+    const char* working_dir = launch_info.GetWorkingDirectory ();
+    if (working_dir)
+    {
+      FileSpec working_dir_fs (working_dir, true);
+      if (!working_dir_fs || working_dir_fs.GetFileType () != FileSpec::eFileTypeDirectory)
+      {
+          error.SetErrorStringWithFormat ("No such file or directory: %s", working_dir);
+          return error;
+      }
+    }
+
+    // FIXME set this in the constructor.
+    // SetPrivateState(eStateLaunching);
+
+    const lldb_private::ProcessLaunchInfo::FileAction *file_action;
+
+    // Default of NULL will mean to use existing open file descriptors.
+    const char *stdin_path = NULL;
+    const char *stdout_path = NULL;
+    const char *stderr_path = NULL;
+
+    file_action = launch_info.GetFileActionForFD (STDIN_FILENO);
+    stdin_path = GetFilePath (file_action, stdin_path);
+
+    file_action = launch_info.GetFileActionForFD (STDOUT_FILENO);
+    stdout_path = GetFilePath (file_action, stdout_path);
+
+    file_action = launch_info.GetFileActionForFD (STDERR_FILENO);
+    stderr_path = GetFilePath (file_action, stderr_path);
+
+    // Create the NativeProcessLinux in launch mode.
+    native_process_sp.reset (
+        new NativeProcessLinux (
+            broadcaster_manager,
+            exe_module,
+            launch_info.GetArguments ().GetConstArgumentVector (),
+            launch_info.GetEnvironmentEntries ().GetConstArgumentVector (),
+            stdin_path,
+            stdout_path,
+            stderr_path,
+            working_dir,
+            error));
+
+    // FIXME save this in constructor if we need it.
+    // m_module = module;
+
+    if (!error.Success())
+        return error;
+
+    // FIXME need this?
+    // SetSTDIOFileDescriptor (m_monitor->GetTerminalFD());
+
+    // FIXME need this?
+    // SetID(m_monitor->GetPID());
+    return error;
+}
+
+// -----------------------------------------------------------------------------
+// Private Static Methods
+// -----------------------------------------------------------------------------
+
+const char *
+NativeProcessLinux::GetFilePath (
+    const lldb_private::ProcessLaunchInfo::FileAction *file_action,
+    const char *default_path)
+{
+    const char *pts_name = "/dev/pts/";
+    const char *path = NULL;
+
+    if (file_action)
+    {
+        if (file_action->GetAction () == ProcessLaunchInfo::FileAction::eFileActionOpen)
+        {
+            path = file_action->GetPath ();
+            // By default the stdio paths passed in will be pseudo-terminal
+            // (/dev/pts). If so, convert to using a different default path
+            // instead to redirect I/O to the debugger console. This should
+            //  also handle user overrides to /dev/null or a different file.
+            if (!path || ::strncmp (path, pts_name, ::strlen (pts_name)) == 0)
+                path = default_path;
+        }
+    }
+
+    return path;
+}
+
+// -----------------------------------------------------------------------------
+// Public Instance Methods
+// -----------------------------------------------------------------------------
+
 //------------------------------------------------------------------------------
 /// The basic design of the NativeProcessLinux is built around two threads.
 ///
@@ -1003,7 +1120,6 @@ NativeProcessLinux::AttachArgs::~AttachArgs()
 /// on the Operation class for more info as to why this is needed.
 NativeProcessLinux::NativeProcessLinux(
     BroadcasterManager *broadcaster_manager,
-    Listener *listener,
     Module *module,
     const char *argv[],
     const char *envp[],
@@ -1013,8 +1129,7 @@ NativeProcessLinux::NativeProcessLinux(
     const char *working_dir,
     lldb_private::Error &error) :
     NativeProcessProtocol(LLDB_INVALID_PROCESS_ID, broadcaster_manager),
-    m_listener(listener),
-    m_signals(),
+    m_listener(NULL),
     m_arch(module ? module->GetArchitecture () : ArchSpec ()),
     m_operation_thread(LLDB_INVALID_HOST_THREAD),
     m_monitor_thread(LLDB_INVALID_HOST_THREAD),
@@ -1022,13 +1137,6 @@ NativeProcessLinux::NativeProcessLinux(
     m_terminal_fd(-1),
     m_operation(0)
 {
-    if (!listener)
-    {
-        error.SetErrorToGenericError();
-        error.SetErrorString("NativeProcessLinux's listener cannot be NULL.");
-        return;
-    }
-
     std::unique_ptr<LaunchArgs> args(new LaunchArgs(this, module, argv, envp,
                                      stdin_path, stdout_path, stderr_path,
                                      working_dir));
@@ -1074,12 +1182,10 @@ WAIT_AGAIN:
 
 NativeProcessLinux::NativeProcessLinux(
     BroadcasterManager *broadcaster_manager,
-    Listener *listener,
     lldb::pid_t pid,
     lldb_private::Error &error) :
     NativeProcessProtocol(pid, broadcaster_manager),
-    m_listener(listener),
-    m_signals(),
+    m_listener(NULL),
     m_arch(),
     m_operation_thread(LLDB_INVALID_HOST_THREAD),
     m_monitor_thread(LLDB_INVALID_HOST_THREAD),
@@ -1643,7 +1749,7 @@ NativeProcessLinux::MonitorSignal(NativeProcessLinux *monitor,
         if (log)
             log->Printf ("NativeProcessLinux::%s() received signal %s with code %s, pid = %d",
                             __FUNCTION__,
-                            monitor->GetUnixSignals().GetSignalAsCString (signo),
+                            GetUnixSignals ().GetSignalAsCString (signo),
                             (info->si_code == SI_TKILL ? "SI_TKILL" : "SI_USER"),
                             info->si_pid);
 
@@ -1654,7 +1760,7 @@ NativeProcessLinux::MonitorSignal(NativeProcessLinux *monitor,
     }
 
     if (log)
-        log->Printf ("NativeProcessLinux::%s() received signal %s", __FUNCTION__, monitor->GetUnixSignals().GetSignalAsCString (signo));
+        log->Printf ("NativeProcessLinux::%s() received signal %s", __FUNCTION__, GetUnixSignals ().GetSignalAsCString (signo));
 
     if (signo == SIGSEGV) {
         lldb::addr_t fault_addr = reinterpret_cast<lldb::addr_t>(info->si_addr);

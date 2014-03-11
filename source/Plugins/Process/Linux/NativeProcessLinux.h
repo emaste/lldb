@@ -16,9 +16,12 @@
 
 // C++ Includes
 // Other libraries and framework includes
+#include "lldb/Core/ArchSpec.h"
 #include "lldb/lldb-types.h"
 #include "lldb/Host/Debug.h"
 #include "lldb/Host/Mutex.h"
+#include "lldb/Target/Process.h"
+
 #include "ProcessMessage.h"
 
 namespace lldb_private
@@ -39,6 +42,10 @@ namespace lldb_private
     class NativeProcessLinux: public NativeProcessProtocol
     {
     public:
+
+        // ---------------------------------------------------------------------
+        // Public Types
+        // ---------------------------------------------------------------------
 
         class Listener
         {
@@ -72,11 +79,31 @@ namespace lldb_private
             HasThread (lldb::pid_t tid) = 0;
         };
 
+        // ---------------------------------------------------------------------
+        // Public Static Methods
+        // ---------------------------------------------------------------------
+
+        static lldb_private::Error
+        LaunchProcess (
+            BroadcasterManager *broadcaster_manager,
+            lldb_private::Module *exe_module,
+            lldb_private::ProcessLaunchInfo &launch_info,
+            lldb::NativeProcessProtocolSP &native_process_sp);
+
+        static lldb_private::Error
+        DoAttachToProcessWithID(
+            BroadcasterManager *broadcaster_manager,
+            lldb::pid_t pid,
+            lldb::NativeProcessProtocolSP &native_process_sp);
+
+        // ---------------------------------------------------------------------
+        // Public Instance Methods
+        // ---------------------------------------------------------------------
+
         /// Launches an inferior process ready for debugging.  Forms the
         /// implementation of Process::DoLaunch.
         NativeProcessLinux(
             BroadcasterManager *broadcaster_manager,
-            Listener *listener,
             lldb_private::Module *module,
             char const *argv[],
             char const *envp[],
@@ -88,7 +115,6 @@ namespace lldb_private
 
         NativeProcessLinux(
             BroadcasterManager *broadcaster_manager,
-            Listener *listener,
             lldb::pid_t pid,
             lldb_private::Error &error);
         
@@ -118,10 +144,6 @@ namespace lldb_private
         /// If we have that, then we can get rid of this function.
         void
         SetArchitecture (const lldb_private::ArchSpec &arch) { m_arch = arch; }
-
-        /// Return the unix signals supported by this process.
-        const lldb_private::UnixSignals&
-        GetUnixSignals () const { return m_signals; }
 
         /// Returns a file descriptor to the controlling terminal of the inferior
         /// process.
@@ -240,10 +262,35 @@ namespace lldb_private
         bool
         WaitForInitialTIDStop(lldb::tid_t tid);
 
+        // ---------------------------------------------------------------------
+        // NativeProcessProtocol Interface
+        // ---------------------------------------------------------------------
+        virtual Error Resume (const ResumeActionList &resume_actions);
+        virtual Error Halt ();
+        virtual Error Detach ();
+        virtual Error Signal (int signo);
+        virtual Error Kill ();
+
+        virtual Error ReadMemory (lldb::addr_t addr, void *buf, lldb::addr_t size, lldb::addr_t &bytes_read);
+        virtual Error WriteMemory (lldb::addr_t addr, const void *buf, lldb::addr_t size, lldb::addr_t &bytes_written);
+        virtual Error AllocateMemory (lldb::addr_t size, uint32_t permissions, lldb::addr_t &addr);
+        virtual Error DeallocateMemory (lldb::addr_t addr);
+
+        virtual lldb::addr_t GetSharedLibraryInfoAddress ();
+
+        virtual bool IsAlive ();
+        virtual size_t UpdateThreads ();
+        virtual bool GetArchitecture (ArchSpec &arch);
+
+        virtual Error SetBreakpoint (lldb::addr_t addr, size_t size, bool hardware);
+        virtual Error RemoveBreakpoint (lldb::addr_t addr, size_t size);
+
+        virtual uint32_t GetMaxWatchpoints ();
+        virtual Error SetWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags, bool hardware);
+        virtual Error RemoveWatchpoint (lldb::addr_t addr);
+
     private:
-        // ProcessLinux *m_process;
         Listener *m_listener;
-        lldb_private::UnixSignals m_signals;
         lldb_private::ArchSpec m_arch;
 
         lldb::thread_t m_operation_thread;
@@ -298,6 +345,17 @@ namespace lldb_private
             const char *m_working_dir;      // Working directory or NULL.
         };
 
+        // ---------------------------------------------------------------------
+        // Private Static Methods
+        // ---------------------------------------------------------------------
+        static const char *
+        GetFilePath (
+            const lldb_private::ProcessLaunchInfo::FileAction *file_action,
+            const char *default_path);
+
+        // ---------------------------------------------------------------------
+        // Private Instance Methods
+        // ---------------------------------------------------------------------
         void
         StartLaunchOpThread(LaunchArgs *args, lldb_private::Error &error);
 
