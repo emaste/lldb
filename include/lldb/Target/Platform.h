@@ -859,10 +859,14 @@ namespace lldb_private {
         GetTrapHandlerSymbolNames ();
 
         //------------------------------------------------------------------
-        /// Launch a process for debugging and return a NativeProcessProtocol. 
+        /// Launch a process for debugging and return a NativeProcessProtocol.
         ///
         /// @param[in] launch_info
         ///     Information required to launch the process.
+        ///
+        /// @param[in] broadcaster_manager
+        ///     The broadcaster_manager to use for the construction of
+        ///     the NativeProcessProtocol Broadcaster.
         ///
         /// @param[out] process_sp
         ///     On successful return from the method, this parameter
@@ -874,7 +878,10 @@ namespace lldb_private {
         ///     An error object indicating if the operation succeeded.
         //------------------------------------------------------------------
         virtual Error
-        LaunchDebugProcess (ProcessLaunchInfo &launch_info, lldb::NativeProcessProtocolSP &process_sp);
+        LaunchDebugProcess (
+            ProcessLaunchInfo &launch_info,
+            BroadcasterManager *broadcaster_manager,
+            lldb::NativeProcessProtocolSP &process_sp);
 
     protected:
         bool m_is_host;

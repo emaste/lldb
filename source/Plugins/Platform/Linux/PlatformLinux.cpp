@@ -491,7 +491,10 @@ PlatformLinux::CalculateTrapHandlerSymbolNames ()
 }   
 
 Error
-PlatformLinux::LaunchDebugProcess (ProcessLaunchInfo &launch_info, lldb::NativeProcessProtocolSP &process_sp)
+PlatformLinux::LaunchDebugProcess (
+    ProcessLaunchInfo &launch_info,
+    BroadcasterManager *broadcaster_manager,
+    lldb::NativeProcessProtocolSP &process_sp)
 {
     if (!IsHost ())
         return Error("PlatformLinux::%s (): cannot launch a debug process when not the host", __FUNCTION__);
@@ -512,8 +515,6 @@ PlatformLinux::LaunchDebugProcess (ProcessLaunchInfo &launch_info, lldb::NativeP
         return Error("exe_module_sp could not be resolved for %s", launch_info.GetExecutableFile ().GetPath ().c_str ());
 
     // Launch it for debugging
-    // FIXME pass in the real deal
-    BroadcasterManager *broadcaster_manager = NULL;
     error = NativeProcessLinux::LaunchProcess (
         broadcaster_manager,
         exe_module_sp.get (),

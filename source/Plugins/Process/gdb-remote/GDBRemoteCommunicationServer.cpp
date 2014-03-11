@@ -18,6 +18,7 @@
 #include "llvm/ADT/Triple.h"
 #include "lldb/Interpreter/Args.h"
 #include "lldb/Core/ConnectionFileDescriptor.h"
+#include "lldb/Core/Debugger.h"
 #include "lldb/Core/Log.h"
 #include "lldb/Core/State.h"
 #include "lldb/Core/StreamString.h"
@@ -52,12 +53,15 @@ GDBRemoteCommunicationServer::GDBRemoteCommunicationServer(bool is_platform) :
     m_port_map (),
     m_port_offset(0),
     m_debugged_process_mutex (Mutex::eMutexTypeRecursive),
-    m_debugged_process_sp ()
+    m_debugged_process_sp (),
+    m_debugger_sp ()
 {
+    assert(is_platform && "must be lldb-platform if debugger is not specified");
 }
 
 GDBRemoteCommunicationServer::GDBRemoteCommunicationServer(bool is_platform,
-                                                           const lldb::PlatformSP& platform_sp) :
+                                                           const lldb::PlatformSP& platform_sp,
+                                                           lldb::DebuggerSP &debugger_sp) :
     GDBRemoteCommunication ("gdb-remote.server", "gdb-remote.server.rx_packet", is_platform),
     m_platform_sp (platform_sp),
     m_async_thread (LLDB_INVALID_HOST_THREAD),
@@ -70,9 +74,11 @@ GDBRemoteCommunicationServer::GDBRemoteCommunicationServer(bool is_platform,
     m_port_map (),
     m_port_offset(0),
     m_debugged_process_mutex (Mutex::eMutexTypeRecursive),
-    m_debugged_process_sp ()
+    m_debugged_process_sp (),
+    m_debugger_sp (debugger_sp)
 {
     assert(platform_sp);
+    assert((is_platform || debugger_sp) && "must specify non-NULL debugger_sp when lldb-gdbserver");
 }
 
 //----------------------------------------------------------------------
@@ -312,7 +318,10 @@ GDBRemoteCommunicationServer::LaunchDebugServerProcess ()
     {
         Mutex::Locker locker (m_debugged_process_mutex);
         assert (!m_debugged_process_sp && "lldb-gdbserver creating debugged process but one already exists");
-        error = m_platform_sp->LaunchDebugProcess (m_process_launch_info, m_debugged_process_sp);
+        error = m_platform_sp->LaunchDebugProcess (
+            m_process_launch_info,
+            m_debugger_sp.get (),
+            m_debugged_process_sp);
     }
 
     if (!error.Success ())

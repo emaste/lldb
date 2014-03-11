@@ -289,7 +289,7 @@ main (int argc, char *argv[])
     }
 
     const bool is_platform = false;
-    GDBRemoteCommunicationServer gdb_server (is_platform, platform_sp);
+    GDBRemoteCommunicationServer gdb_server (is_platform, platform_sp, debugger_sp);
 
     const char *host_and_port = argv[0];
     argc -= 1;

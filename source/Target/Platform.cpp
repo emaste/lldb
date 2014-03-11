@@ -1186,7 +1186,10 @@ Platform::CalculateMD5 (const FileSpec& file_spec,
 }
 
 Error
-Platform::LaunchDebugProcess (ProcessLaunchInfo &launch_info, lldb::NativeProcessProtocolSP &process_sp)
+Platform::LaunchDebugProcess (
+    ProcessLaunchInfo &launch_info,
+    BroadcasterManager *broadcaster_manager,
+    lldb::NativeProcessProtocolSP &process_sp)
 {
     // right now we're having each platform individually implement
     // this since there are some diffs in impls.
