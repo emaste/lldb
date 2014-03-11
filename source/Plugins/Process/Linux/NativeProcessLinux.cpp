@@ -73,7 +73,7 @@
 #define tgkill(pid, tid, sig)  syscall(SYS_tgkill, pid, tid, sig)
 
 // Private bits we only need internally.
-namespace _NativeProcessLinux_impl
+namespace
 {
     static const lldb_private::UnixSignals&
     GetUnixSignals ()
@@ -84,7 +84,6 @@ namespace _NativeProcessLinux_impl
 }
 
 using namespace lldb_private;
-using namespace _NativeProcessLinux_impl;
 
 // FIXME: this code is host-dependent with respect to types and
 // endianness and needs to be fixed.  For example, lldb::addr_t is
