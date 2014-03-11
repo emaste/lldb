@@ -112,6 +112,43 @@ namespace
         else
             return Error("failed to retrieve a valid architecture from the exe module");
     }
+
+    class LoggingListener: public NativeProcessLinux::Listener
+    {
+    public:
+        virtual void
+        OnMessage (const ProcessMessage &message)
+            {
+                printf ("LoggingListener::%s () called\n", __FUNCTION__);
+            }
+
+        virtual void
+        OnNewThread (lldb::pid_t tid)
+            {
+                printf ("LoggingListener::%s (tid=%" PRIu64 ") called\n", __FUNCTION__, tid);
+            }
+
+        virtual void
+        OnThreadStopped (lldb::pid_t tid)
+            {
+                printf ("LoggingListener::%s (tid=%" PRIu64 ") called\n", __FUNCTION__, tid);
+            }
+
+        virtual bool
+        HasThread (lldb::pid_t tid)
+            {
+                printf ("LoggingListener::%s (tid=%" PRIu64 ") called, returning true\n", __FUNCTION__, tid);
+                // FIXME If we need to keep this, this needs to be corrected.
+                return true;
+            }
+    };
+
+    LoggingListener&
+    GetSharedLoggingListener ()
+    {
+        static LoggingListener listener;
+        return listener;
+    }
 }
 
 using namespace lldb_private;
@@ -1187,7 +1224,7 @@ NativeProcessLinux::GetFilePath (
 /// launching or attaching to the inferior process, and then 2) servicing
 /// operations such as register reads/writes, stepping, etc.  See the comments
 /// on the Operation class for more info as to why this is needed.
-NativeProcessLinux::NativeProcessLinux(
+NativeProcessLinux::NativeProcessLinux (
     BroadcasterManager *broadcaster_manager,
     Module *module,
     const char *argv[],
@@ -1197,14 +1234,14 @@ NativeProcessLinux::NativeProcessLinux(
     const char *stderr_path,
     const char *working_dir,
     lldb_private::Error &error) :
-    NativeProcessProtocol(LLDB_INVALID_PROCESS_ID, broadcaster_manager),
-    m_listener(NULL),
-    m_arch(module ? module->GetArchitecture () : ArchSpec ()),
-    m_operation_thread(LLDB_INVALID_HOST_THREAD),
-    m_monitor_thread(LLDB_INVALID_HOST_THREAD),
-    m_pid(LLDB_INVALID_PROCESS_ID),
-    m_terminal_fd(-1),
-    m_operation(0)
+    NativeProcessProtocol (LLDB_INVALID_PROCESS_ID, broadcaster_manager),
+    m_listener (&(GetSharedLoggingListener ())),
+    m_arch (module ? module->GetArchitecture () : ArchSpec ()),
+    m_operation_thread (LLDB_INVALID_HOST_THREAD),
+    m_monitor_thread (LLDB_INVALID_HOST_THREAD),
+    m_pid (LLDB_INVALID_PROCESS_ID),
+    m_terminal_fd (-1),
+    m_operation (0)
 {
     std::unique_ptr<LaunchArgs> args(new LaunchArgs(this, module, argv, envp,
                                      stdin_path, stdout_path, stderr_path,
@@ -1249,56 +1286,56 @@ WAIT_AGAIN:
     }
 }
 
-NativeProcessLinux::NativeProcessLinux(
+NativeProcessLinux::NativeProcessLinux (
     BroadcasterManager *broadcaster_manager,
     lldb::pid_t pid,
     lldb_private::Error &error) :
-    NativeProcessProtocol(pid, broadcaster_manager),
-    m_listener(NULL),
-    m_arch(),
-    m_operation_thread(LLDB_INVALID_HOST_THREAD),
-    m_monitor_thread(LLDB_INVALID_HOST_THREAD),
-    m_pid(LLDB_INVALID_PROCESS_ID),
-    m_terminal_fd(-1),
-    m_operation(0)
+    NativeProcessProtocol (pid, broadcaster_manager),
+    m_listener(&(GetSharedLoggingListener ())),
+    m_arch (),
+    m_operation_thread (LLDB_INVALID_HOST_THREAD),
+    m_monitor_thread (LLDB_INVALID_HOST_THREAD),
+    m_pid (LLDB_INVALID_PROCESS_ID),
+    m_terminal_fd (-1),
+    m_operation (0)
 {
-    sem_init(&m_operation_pending, 0, 0);
-    sem_init(&m_operation_done, 0, 0);
+    sem_init (&m_operation_pending, 0, 0);
+    sem_init (&m_operation_done, 0, 0);
 
-    std::unique_ptr<AttachArgs> args(new AttachArgs(this, pid));
+    std::unique_ptr<AttachArgs> args (new AttachArgs (this, pid));
 
-    StartAttachOpThread(args.get(), error);
-    if (!error.Success())
+    StartAttachOpThread(args.get (), error);
+    if (!error.Success ())
         return;
 
 WAIT_AGAIN:
     // Wait for the operation thread to initialize.
-    if (sem_wait(&args->m_semaphore))
+    if (sem_wait (&args->m_semaphore))
     {
         if (errno == EINTR)
             goto WAIT_AGAIN;
         else
         {
-            error.SetErrorToErrno();
+            error.SetErrorToErrno ();
             return;
         }
     }
 
     // Check that the attach was a success.
-    if (!args->m_error.Success())
+    if (!args->m_error.Success ())
     {
-        StopOpThread();
+        StopOpThread ();
         error = args->m_error;
         return;
     }
 
     // Finally, start monitoring the child process for change in state.
-    m_monitor_thread = Host::StartMonitoringChildProcess(
-        NativeProcessLinux::MonitorCallback, this, GetPID(), true);
-    if (!IS_VALID_LLDB_HOST_THREAD(m_monitor_thread))
+    m_monitor_thread = Host::StartMonitoringChildProcess (
+        NativeProcessLinux::MonitorCallback, this, GetPID (), true);
+    if (!IS_VALID_LLDB_HOST_THREAD (m_monitor_thread))
     {
-        error.SetErrorToGenericError();
-        error.SetErrorString("Process attach failed.");
+        error.SetErrorToGenericError ();
+        error.SetErrorString ("Process attach failed.");
         return;
     }
 }
