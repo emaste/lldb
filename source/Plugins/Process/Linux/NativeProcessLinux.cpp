@@ -75,11 +75,42 @@
 // Private bits we only need internally.
 namespace
 {
-    static const lldb_private::UnixSignals&
+    using namespace lldb;
+    using namespace lldb_private;
+
+    const UnixSignals&
     GetUnixSignals ()
     {
         static process_linux::LinuxSignals signals;
         return signals;
+    }
+
+    Error
+    ResolveProcessArchitecture (lldb::pid_t pid, Platform &platform, ArchSpec &arch)
+    {
+        // Grab process info for the running process.
+        ProcessInstanceInfo process_info;
+        if (!platform.GetProcessInfo (pid, process_info))
+            return lldb_private::Error("failed to get process info");
+
+        // Resolve the executable module.
+        ModuleSP exe_module_sp;
+        FileSpecList executable_search_paths (Target::GetDefaultExecutableSearchPaths ());
+        Error error = platform.ResolveExecutable(
+            process_info.GetExecutableFile (),
+            platform.GetSystemArchitecture (),
+            exe_module_sp,
+            executable_search_paths.GetSize () ? &executable_search_paths : NULL);
+
+        if (!error.Success ())
+            return error;
+
+        // Check if we've got our architecture from the exe_module.
+        arch = exe_module_sp->GetArchitecture ();
+        if (arch.IsValid ())
+            return Error();
+        else
+            return Error("failed to retrieve a valid architecture from the exe module");
     }
 }
 
@@ -181,9 +212,9 @@ PtraceWrapper(int req, lldb::pid_t pid, void *addr, void *data, size_t data_size
 
     errno = 0;
     if (req == PTRACE_GETREGSET || req == PTRACE_SETREGSET)
-        result = ptrace(static_cast<__ptrace_request>(req), static_cast<pid_t>(pid), *(unsigned int *)addr, data);
+        result = ptrace(static_cast<__ptrace_request>(req), static_cast<::pid_t>(pid), *(unsigned int *)addr, data);
     else
-        result = ptrace(static_cast<__ptrace_request>(req), static_cast<pid_t>(pid), addr, data);
+        result = ptrace(static_cast<__ptrace_request>(req), static_cast<::pid_t>(pid), addr, data);
 
     if (log)
         log->Printf("ptrace(%s, %" PRIu64 ", %p, %p, %zu)=%lX called from file %s line %d",
@@ -211,14 +242,14 @@ PtraceWrapper(int req, lldb::pid_t pid, void *addr, void *data, size_t data_size
 // Wrapper for ptrace when logging is not required.
 // Sets errno to 0 prior to calling ptrace.
 extern long
-PtraceWrapper(int req, pid_t pid, void *addr, void *data, size_t data_size)
+PtraceWrapper(int req, lldb::pid_t pid, void *addr, void *data, size_t data_size)
 {
     long result = 0;
     errno = 0;
     if (req == PTRACE_GETREGSET || req == PTRACE_SETREGSET)
-        result = ptrace(static_cast<__ptrace_request>(req), pid, *(unsigned int *)addr, data);
+        result = ptrace(static_cast<__ptrace_request>(req), static_cast<::pid_t>(pid), *(unsigned int *)addr, data);
     else
-        result = ptrace(static_cast<__ptrace_request>(req), pid, addr, data);
+        result = ptrace(static_cast<__ptrace_request>(req), static_cast<::pid_t>(pid), addr, data);
     return result;
 }
 
@@ -1072,6 +1103,45 @@ NativeProcessLinux::LaunchProcess (
     return error;
 }
 
+lldb_private::Error
+NativeProcessLinux::DoAttachToProcessWithID (
+    BroadcasterManager *broadcaster_manager,
+    lldb::pid_t pid,
+    lldb::NativeProcessProtocolSP &native_process_sp)
+{
+    Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_PROCESS));
+    if (log && log->GetMask ().Test (POSIX_LOG_VERBOSE))
+        log->Printf ("NativeProcessLinux::%s(pid = %" PRIi64 ")", __FUNCTION__, pid);
+
+    // Grab the current platform architecture.  This should be Linux,
+    // since this code is only intended to run on a Linux host.
+    PlatformSP platform_sp (Platform::GetDefaultPlatform ());
+    if (!platform_sp)
+        return Error("failed to get a valid default platform");
+
+    // Retrieve the architecture for the running process.
+    ArchSpec process_arch;
+    Error error = ResolveProcessArchitecture (pid, *platform_sp.get (), process_arch);
+    if (!error.Success ())
+        return error;
+
+    native_process_sp.reset(new NativeProcessLinux (broadcaster_manager, pid, error));
+    if (!error.Success ())
+        return error;
+
+    // FIXME do we care about this?
+    // Initialize the target module list
+    // m_target.SetExecutableModule (exe_module_sp, true);
+
+    // FIXME do we care about this?
+    // SetSTDIOFileDescriptor(m_monitor->GetTerminalFD());
+
+    // FIXME do we care about this?
+    // SetID(pid);
+
+    return error;
+}
+
 // -----------------------------------------------------------------------------
 // Private Static Methods
 // -----------------------------------------------------------------------------
@@ -1352,7 +1422,7 @@ NativeProcessLinux::Launch(LaunchArgs *args)
     }
 
     // Wait for the child process to to trap on its call to execve.
-    pid_t wpid;
+    ::pid_t wpid;
     int status;
     if ((wpid = waitpid(pid, &status, 0)) < 0)
     {
@@ -1392,7 +1462,7 @@ NativeProcessLinux::Launch(LaunchArgs *args)
         }
         goto FINISH;
     }
-    assert(WIFSTOPPED(status) && (wpid == static_cast<pid_t> (pid)) &&
+    assert(WIFSTOPPED(status) && (wpid == static_cast<::pid_t> (pid)) &&
            "Could not sync with inferior process.");
 
     if (!SetDefaultPtraceOpts(pid))

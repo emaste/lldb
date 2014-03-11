@@ -82,7 +82,6 @@ namespace lldb_private
         // ---------------------------------------------------------------------
         // Public Static Methods
         // ---------------------------------------------------------------------
-
         static lldb_private::Error
         LaunchProcess (
             BroadcasterManager *broadcaster_manager,
@@ -91,7 +90,7 @@ namespace lldb_private
             lldb::NativeProcessProtocolSP &native_process_sp);
 
         static lldb_private::Error
-        DoAttachToProcessWithID(
+        DoAttachToProcessWithID (
             BroadcasterManager *broadcaster_manager,
             lldb::pid_t pid,
             lldb::NativeProcessProtocolSP &native_process_sp);
