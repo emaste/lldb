@@ -1186,7 +1186,7 @@ Platform::CalculateMD5 (const FileSpec& file_spec,
 }
 
 Error
-Platform::CreateNativeProcessProtocol (lldb::pid_t pid, lldb::NativeProcessProtocolSP &protocol_sp)
+Platform::LaunchDebugProcess (ProcessLaunchInfo &launch_info, lldb::NativeProcessProtocolSP &process_sp)
 {
     // right now we're having each platform individually implement
     // this since there are some diffs in impls.

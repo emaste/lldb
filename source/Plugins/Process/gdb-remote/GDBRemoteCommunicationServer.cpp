@@ -51,8 +51,8 @@ GDBRemoteCommunicationServer::GDBRemoteCommunicationServer(bool is_platform) :
     m_proc_infos_index (0),
     m_port_map (),
     m_port_offset(0),
-    m_protocol_mutex (Mutex::eMutexTypeRecursive),
-    m_process_protocol_sp ()
+    m_debugged_process_mutex (Mutex::eMutexTypeRecursive),
+    m_debugged_process_sp ()
 {
 }
 
@@ -69,8 +69,8 @@ GDBRemoteCommunicationServer::GDBRemoteCommunicationServer(bool is_platform,
     m_proc_infos_index (0),
     m_port_map (),
     m_port_offset(0),
-    m_protocol_mutex (Mutex::eMutexTypeRecursive),
-    m_process_protocol_sp ()
+    m_debugged_process_mutex (Mutex::eMutexTypeRecursive),
+    m_debugged_process_sp ()
 {
     assert(platform_sp);
 }
@@ -82,30 +82,6 @@ GDBRemoteCommunicationServer::~GDBRemoteCommunicationServer()
 {
 }
 
-
-//void *
-//GDBRemoteCommunicationServer::AsyncThread (void *arg)
-//{
-//    GDBRemoteCommunicationServer *server = (GDBRemoteCommunicationServer*) arg;
-//
-//    Log *log;// (ProcessGDBRemoteLog::GetLogIfAllCategoriesSet (GDBR_LOG_PROCESS));
-//    if (log)
-//        log->Printf ("ProcessGDBRemote::%s (arg = %p, pid = %i) thread starting...", __FUNCTION__, arg, process->GetID());
-//
-//    StringExtractorGDBRemote packet;
-//
-//    while ()
-//    {
-//        if (packet.
-//    }
-//
-//    if (log)
-//        log->Printf ("ProcessGDBRemote::%s (arg = %p, pid = %i) thread exiting...", __FUNCTION__, arg, process->GetID());
-//
-//    process->m_async_thread = LLDB_INVALID_HOST_THREAD;
-//    return NULL;
-//}
-//
 bool
 GDBRemoteCommunicationServer::GetPacketAndSendResponse (uint32_t timeout_usec,
                                                         Error &error,
@@ -318,6 +294,54 @@ GDBRemoteCommunicationServer::SetLaunchFlags (unsigned int launch_flags)
 lldb_private::Error
 GDBRemoteCommunicationServer::LaunchProcess ()
 {
+    // FIXME This looks an awful lot like we could override this in
+    // derived classes, one for lldb-platform, the other for lldb-gdbserver.
+    if (IsGdbServer ())
+        return LaunchDebugServerProcess ();
+    else
+        return LaunchPlatformProcess ();
+}
+
+lldb_private::Error
+GDBRemoteCommunicationServer::LaunchDebugServerProcess ()
+{
+    if (!m_process_launch_info.GetArguments ().GetArgumentCount ())
+        return lldb_private::Error ("%s: no process command line specified to launch", __FUNCTION__);
+
+    lldb_private::Error error;
+    {
+        Mutex::Locker locker (m_debugged_process_mutex);
+        assert (!m_debugged_process_sp && "lldb-gdbserver creating debugged process but one already exists");
+        error = m_platform_sp->LaunchDebugProcess (m_process_launch_info, m_debugged_process_sp);
+    }
+
+    if (!error.Success ())
+    {
+        fprintf (stderr, "%s: failed to launch executable %s", __FUNCTION__, m_process_launch_info.GetArguments ().GetArgumentAtIndex (0));
+        return error;
+    }
+
+    printf ("Launched '%s' as process %" PRIu64 "...\n", m_process_launch_info.GetArguments ().GetArgumentAtIndex (0), m_process_launch_info.GetProcessID ());
+
+    // Add to list of spawned processes.
+    lldb::pid_t pid;
+    if ((pid = m_process_launch_info.GetProcessID ()) != LLDB_INVALID_PROCESS_ID)
+    {
+        // add to spawned pids
+        {
+            Mutex::Locker locker (m_spawned_pids_mutex);
+            // On an lldb-gdbserver, we would expect there to be only one.
+            assert (m_spawned_pids.empty () && "lldb-gdbserver adding tracked process but one already existed");
+            m_spawned_pids.insert (pid);
+        }
+    }
+
+    return error;
+}
+
+lldb_private::Error
+GDBRemoteCommunicationServer::LaunchPlatformProcess ()
+{
     if (!m_process_launch_info.GetArguments ().GetArgumentCount ())
         return lldb_private::Error ("%s: no process command line specified to launch", __FUNCTION__);
 
@@ -345,21 +369,6 @@ GDBRemoteCommunicationServer::LaunchProcess ()
         {
             Mutex::Locker locker (m_spawned_pids_mutex);
             m_spawned_pids.insert(pid);
-        }
-
-        if (IsGdbServer ())
-        {
-            // retrieve the NativeProcessProtocol for the thread
-            assert (m_platform_sp);
-
-            Mutex::Locker locker (m_protocol_mutex);
-            error = m_platform_sp->CreateNativeProcessProtocol (pid, m_process_protocol_sp);
-            if (error.Fail ())
-            {
-                fprintf (stderr, "%s: failed to create a native process for " PRIu64 ": %s", __FUNCTION__, pid, error.AsCString ());
-                return error;
-            }
-            assert (m_process_protocol_sp);
         }
     }
 

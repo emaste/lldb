@@ -348,9 +348,17 @@ private:
         return !m_is_platform;
     }
 
+    /// Launch a process from lldb-gdbserver
+    lldb_private::Error
+    LaunchDebugServerProcess ();
+
+    /// Launch a process from lldb-platform
+    lldb_private::Error
+    LaunchPlatformProcess ();
+
     // private member variables
-    lldb_private::Mutex m_protocol_mutex;
-    lldb::NativeProcessProtocolSP m_process_protocol_sp;
+    lldb_private::Mutex m_debugged_process_mutex;
+    lldb::NativeProcessProtocolSP m_debugged_process_sp;
 
     //------------------------------------------------------------------
     // For GDBRemoteCommunicationServer only

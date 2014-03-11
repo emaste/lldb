@@ -149,6 +149,134 @@ namespace
         static LoggingListener listener;
         return listener;
     }
+
+    void
+    DisplayBytes (lldb_private::StreamString &s, void *bytes, uint32_t count)
+    {
+        uint8_t *ptr = (uint8_t *)bytes;
+        const uint32_t loop_count = std::min<uint32_t>(DEBUG_PTRACE_MAXBYTES, count);
+        for(uint32_t i=0; i<loop_count; i++)
+        {
+            s.Printf ("[%x]", *ptr);
+            ptr++;
+        }
+    }
+
+    void
+    PtraceDisplayBytes(int &req, void *data, size_t data_size)
+    {
+        StreamString buf;
+        Log *verbose_log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (
+                    POSIX_LOG_PTRACE | POSIX_LOG_VERBOSE));
+
+        if (verbose_log)
+        {
+            switch(req)
+            {
+            case PTRACE_POKETEXT:
+            {
+                DisplayBytes(buf, &data, 8);
+                verbose_log->Printf("PTRACE_POKETEXT %s", buf.GetData());
+                break;
+            }
+            case PTRACE_POKEDATA:
+            {
+                DisplayBytes(buf, &data, 8);
+                verbose_log->Printf("PTRACE_POKEDATA %s", buf.GetData());
+                break;
+            }
+            case PTRACE_POKEUSER:
+            {
+                DisplayBytes(buf, &data, 8);
+                verbose_log->Printf("PTRACE_POKEUSER %s", buf.GetData());
+                break;
+            }
+            case PTRACE_SETREGS:
+            {
+                DisplayBytes(buf, data, data_size);
+                verbose_log->Printf("PTRACE_SETREGS %s", buf.GetData());
+                break;
+            }
+            case PTRACE_SETFPREGS:
+            {
+                DisplayBytes(buf, data, data_size);
+                verbose_log->Printf("PTRACE_SETFPREGS %s", buf.GetData());
+                break;
+            }
+            case PTRACE_SETSIGINFO:
+            {
+                DisplayBytes(buf, data, sizeof(siginfo_t));
+                verbose_log->Printf("PTRACE_SETSIGINFO %s", buf.GetData());
+                break;
+            }
+            case PTRACE_SETREGSET:
+            {
+                // Extract iov_base from data, which is a pointer to the struct IOVEC
+                DisplayBytes(buf, *(void **)data, data_size);
+                verbose_log->Printf("PTRACE_SETREGSET %s", buf.GetData());
+                break;
+            }
+            default:
+            {
+            }
+            }
+        }
+    }
+
+    // Wrapper for ptrace to catch errors and log calls.
+    // Note that ptrace sets errno on error because -1 can be a valid result (i.e. for PTRACE_PEEK*)
+    long
+    PtraceWrapper(int req, lldb::pid_t pid, void *addr, void *data, size_t data_size,
+            const char* reqName, const char* file, int line)
+    {
+        long int result;
+
+        Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_PTRACE));
+
+        PtraceDisplayBytes(req, data, data_size);
+
+        errno = 0;
+        if (req == PTRACE_GETREGSET || req == PTRACE_SETREGSET)
+            result = ptrace(static_cast<__ptrace_request>(req), static_cast<::pid_t>(pid), *(unsigned int *)addr, data);
+        else
+            result = ptrace(static_cast<__ptrace_request>(req), static_cast<::pid_t>(pid), addr, data);
+
+        if (log)
+            log->Printf("ptrace(%s, %" PRIu64 ", %p, %p, %zu)=%lX called from file %s line %d",
+                    reqName, pid, addr, data, data_size, result, file, line);
+
+        PtraceDisplayBytes(req, data, data_size);
+
+        if (log && errno != 0)
+        {
+            const char* str;
+            switch (errno)
+            {
+            case ESRCH:  str = "ESRCH"; break;
+            case EINVAL: str = "EINVAL"; break;
+            case EBUSY:  str = "EBUSY"; break;
+            case EPERM:  str = "EPERM"; break;
+            default:     str = "<unknown>";
+            }
+            log->Printf("ptrace() failed; errno=%d (%s)", errno, str);
+        }
+
+        return result;
+    }
+
+    // Wrapper for ptrace when logging is not required.
+    // Sets errno to 0 prior to calling ptrace.
+    long
+    PtraceWrapper(int req, lldb::pid_t pid, void *addr, void *data, size_t data_size)
+    {
+        long result = 0;
+        errno = 0;
+        if (req == PTRACE_GETREGSET || req == PTRACE_SETREGSET)
+            result = ptrace(static_cast<__ptrace_request>(req), static_cast<::pid_t>(pid), *(unsigned int *)addr, data);
+        else
+            result = ptrace(static_cast<__ptrace_request>(req), static_cast<::pid_t>(pid), addr, data);
+        return result;
+    }
 }
 
 using namespace lldb_private;
@@ -162,137 +290,10 @@ using namespace lldb_private;
 // We disable the tracing of ptrace calls for integration builds to
 // avoid the additional indirection and checks.
 #ifndef LLDB_CONFIGURATION_BUILDANDINTEGRATION
-
-static void
-DisplayBytes (lldb_private::StreamString &s, void *bytes, uint32_t count)
-{
-    uint8_t *ptr = (uint8_t *)bytes;
-    const uint32_t loop_count = std::min<uint32_t>(DEBUG_PTRACE_MAXBYTES, count);
-    for(uint32_t i=0; i<loop_count; i++)
-    {
-        s.Printf ("[%x]", *ptr);
-        ptr++;
-    }
-}
-
-static void PtraceDisplayBytes(int &req, void *data, size_t data_size)
-{
-    StreamString buf;
-    Log *verbose_log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (
-                                        POSIX_LOG_PTRACE | POSIX_LOG_VERBOSE));
-
-    if (verbose_log)
-    {
-        switch(req)
-        {
-        case PTRACE_POKETEXT:
-            {
-                DisplayBytes(buf, &data, 8);
-                verbose_log->Printf("PTRACE_POKETEXT %s", buf.GetData());
-                break;
-            }
-        case PTRACE_POKEDATA:
-            {
-                DisplayBytes(buf, &data, 8);
-                verbose_log->Printf("PTRACE_POKEDATA %s", buf.GetData());
-                break;
-            }
-        case PTRACE_POKEUSER:
-            {
-                DisplayBytes(buf, &data, 8);
-                verbose_log->Printf("PTRACE_POKEUSER %s", buf.GetData());
-                break;
-            }
-        case PTRACE_SETREGS:
-            {
-                DisplayBytes(buf, data, data_size);
-                verbose_log->Printf("PTRACE_SETREGS %s", buf.GetData());
-                break;
-            }
-        case PTRACE_SETFPREGS:
-            {
-                DisplayBytes(buf, data, data_size);
-                verbose_log->Printf("PTRACE_SETFPREGS %s", buf.GetData());
-                break;
-            }
-        case PTRACE_SETSIGINFO:
-            {
-                DisplayBytes(buf, data, sizeof(siginfo_t));
-                verbose_log->Printf("PTRACE_SETSIGINFO %s", buf.GetData());
-                break;
-            }
-        case PTRACE_SETREGSET:
-            {
-                // Extract iov_base from data, which is a pointer to the struct IOVEC
-                DisplayBytes(buf, *(void **)data, data_size);
-                verbose_log->Printf("PTRACE_SETREGSET %s", buf.GetData());
-                break;
-            }
-        default:
-            {
-            }
-        }
-    }
-}
-
-// Wrapper for ptrace to catch errors and log calls.
-// Note that ptrace sets errno on error because -1 can be a valid result (i.e. for PTRACE_PEEK*)
-extern long
-PtraceWrapper(int req, lldb::pid_t pid, void *addr, void *data, size_t data_size,
-              const char* reqName, const char* file, int line)
-{
-    long int result;
-
-    Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_PTRACE));
-
-    PtraceDisplayBytes(req, data, data_size);
-
-    errno = 0;
-    if (req == PTRACE_GETREGSET || req == PTRACE_SETREGSET)
-        result = ptrace(static_cast<__ptrace_request>(req), static_cast<::pid_t>(pid), *(unsigned int *)addr, data);
-    else
-        result = ptrace(static_cast<__ptrace_request>(req), static_cast<::pid_t>(pid), addr, data);
-
-    if (log)
-        log->Printf("ptrace(%s, %" PRIu64 ", %p, %p, %zu)=%lX called from file %s line %d",
-                    reqName, pid, addr, data, data_size, result, file, line);
-
-    PtraceDisplayBytes(req, data, data_size);
-
-    if (log && errno != 0)
-    {
-        const char* str;
-        switch (errno)
-        {
-        case ESRCH:  str = "ESRCH"; break;
-        case EINVAL: str = "EINVAL"; break;
-        case EBUSY:  str = "EBUSY"; break;
-        case EPERM:  str = "EPERM"; break;
-        default:     str = "<unknown>";
-        }
-        log->Printf("ptrace() failed; errno=%d (%s)", errno, str);
-    }
-
-    return result;
-}
-
-// Wrapper for ptrace when logging is not required.
-// Sets errno to 0 prior to calling ptrace.
-extern long
-PtraceWrapper(int req, lldb::pid_t pid, void *addr, void *data, size_t data_size)
-{
-    long result = 0;
-    errno = 0;
-    if (req == PTRACE_GETREGSET || req == PTRACE_SETREGSET)
-        result = ptrace(static_cast<__ptrace_request>(req), static_cast<::pid_t>(pid), *(unsigned int *)addr, data);
-    else
-        result = ptrace(static_cast<__ptrace_request>(req), static_cast<::pid_t>(pid), addr, data);
-    return result;
-}
-
 #define PTRACE(req, pid, addr, data, data_size) \
     PtraceWrapper((req), (pid), (addr), (data), (data_size), #req, __FILE__, __LINE__)
 #else
+#define PTRACE(req, pid, addr, data, data_size) \
     PtraceWrapper((req), (pid), (addr), (data), (data_size))
 #endif
 

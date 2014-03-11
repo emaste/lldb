@@ -103,6 +103,9 @@ namespace lldb_private {
         virtual void
         CalculateTrapHandlerSymbolNames ();
 
+        virtual Error
+        LaunchDebugProcess (ProcessLaunchInfo &launch_info, lldb::NativeProcessProtocolSP &process_sp);
+
     protected:
         lldb::PlatformSP m_remote_platform_sp; // Allow multiple ways to connect to a remote darwin OS
         
