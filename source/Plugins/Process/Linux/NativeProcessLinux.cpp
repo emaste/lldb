@@ -78,7 +78,7 @@ namespace
     static const lldb_private::UnixSignals&
     GetUnixSignals ()
     {
-        static LinuxSignals signals;
+        static process_linux::LinuxSignals signals;
         return signals;
     }
 }

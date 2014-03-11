@@ -107,7 +107,7 @@ public:
 private:
 
     /// Linux-specific signal set.
-    LinuxSignals m_linux_signals;
+    process_linux::LinuxSignals m_linux_signals;
 
     lldb_private::FileSpec *m_core_file;
 

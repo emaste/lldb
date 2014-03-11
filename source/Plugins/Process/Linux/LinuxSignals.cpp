@@ -15,6 +15,8 @@
 // Project includes
 #include "LinuxSignals.h"
 
+using namespace process_linux;
+
 LinuxSignals::LinuxSignals()
     : UnixSignals()
 {
