@@ -342,6 +342,16 @@ private:
     bool
     KillSpawnedProcess (lldb::pid_t pid);
 
+    bool
+    IsGdbServer ()
+    {
+        return !m_is_platform;
+    }
+
+    // private member variables
+    lldb_private::Mutex m_protocol_mutex;
+    lldb::NativeProcessProtocolSP m_process_protocol_sp;
+
     //------------------------------------------------------------------
     // For GDBRemoteCommunicationServer only
     //------------------------------------------------------------------

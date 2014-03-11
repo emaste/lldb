@@ -858,6 +858,27 @@ namespace lldb_private {
         virtual const std::vector<ConstString> &
         GetTrapHandlerSymbolNames ();
 
+        //------------------------------------------------------------------
+        /// Create a NativeProcessProtocol for a process on the platform.
+        ///
+        /// @param[in] pid
+        ///     The process id on the platform's system.  This will be
+        ///     a local process id when debugging with a platform for
+        ///     the local system, and a remote process id for a
+        ///     platform attached to a remote system or device.
+        ///
+        /// @param[out] protocol_sp
+        ///     On successful return from the method, this parameter
+        ///     contains the shared pointer to the
+        ///     NativeProcessProtocol that can be used to manipulate
+        ///     the native process.
+        ///
+        /// @return
+        ///     An error object indicating if the operation succeeded.
+        //------------------------------------------------------------------
+        virtual Error
+        CreateNativeProcessProtocol (lldb::pid_t pid, lldb::NativeProcessProtocolSP &protocol_sp);
+
     protected:
         bool m_is_host;
         // Set to true when we are able to actually set the OS version while 

@@ -1185,6 +1185,14 @@ Platform::CalculateMD5 (const FileSpec& file_spec,
         return false;
 }
 
+Error
+Platform::CreateNativeProcessProtocol (lldb::pid_t pid, lldb::NativeProcessProtocolSP &protocol_sp)
+{
+    // right now we're having each platform individually implement
+    // this since there are some diffs in impls.
+    return Error("unimplemented");
+}
+
 void
 Platform::SetLocalCacheDirectory (const char* local)
 {

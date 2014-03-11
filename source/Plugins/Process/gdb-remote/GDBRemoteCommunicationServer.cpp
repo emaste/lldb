@@ -50,7 +50,9 @@ GDBRemoteCommunicationServer::GDBRemoteCommunicationServer(bool is_platform) :
     m_proc_infos (),
     m_proc_infos_index (0),
     m_port_map (),
-    m_port_offset(0)
+    m_port_offset(0),
+    m_protocol_mutex (Mutex::eMutexTypeRecursive),
+    m_process_protocol_sp ()
 {
 }
 
@@ -66,7 +68,9 @@ GDBRemoteCommunicationServer::GDBRemoteCommunicationServer(bool is_platform,
     m_proc_infos (),
     m_proc_infos_index (0),
     m_port_map (),
-    m_port_offset(0)
+    m_port_offset(0),
+    m_protocol_mutex (Mutex::eMutexTypeRecursive),
+    m_process_protocol_sp ()
 {
     assert(platform_sp);
 }
@@ -337,8 +341,26 @@ GDBRemoteCommunicationServer::LaunchProcess ()
     lldb::pid_t pid;
     if ( (pid = m_process_launch_info.GetProcessID()) != LLDB_INVALID_PROCESS_ID )
     {
-        Mutex::Locker locker (m_spawned_pids_mutex);
-        m_spawned_pids.insert(pid);
+        // add to spawned pids
+        {
+            Mutex::Locker locker (m_spawned_pids_mutex);
+            m_spawned_pids.insert(pid);
+        }
+
+        if (IsGdbServer ())
+        {
+            // retrieve the NativeProcessProtocol for the thread
+            assert (m_platform_sp);
+
+            Mutex::Locker locker (m_protocol_mutex);
+            error = m_platform_sp->CreateNativeProcessProtocol (pid, m_process_protocol_sp);
+            if (error.Fail ())
+            {
+                fprintf (stderr, "%s: failed to create a native process for " PRIu64 ": %s", __FUNCTION__, pid, error.AsCString ());
+                return error;
+            }
+            assert (m_process_protocol_sp);
+        }
     }
 
     return error;
