@@ -6,6 +6,7 @@ include_directories(../Utility)
 
 add_lldb_library(lldbPluginProcessLinux
   NativeProcessLinux.cpp
+  NativeThreadLinux.cpp
   ProcessLinux.cpp
   ProcessMonitor.cpp
   LinuxSignals.cpp
