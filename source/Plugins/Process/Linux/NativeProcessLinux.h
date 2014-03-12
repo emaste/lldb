@@ -124,10 +124,6 @@ namespace lldb_private
             eResumeSignalNone = 0
         };
 
-        /// Provides the process number of debugee.
-        lldb::pid_t
-        GetPID() const { return m_pid; }
-
         /// Return the listener associated with this NativeProcessLinux.
         Listener&
         GetListener () { return *m_listener; }
@@ -294,7 +290,6 @@ namespace lldb_private
 
         lldb::thread_t m_operation_thread;
         lldb::thread_t m_monitor_thread;
-        lldb::pid_t m_pid;
         int m_terminal_fd;
 
         // current operation which must be executed on the priviliged thread

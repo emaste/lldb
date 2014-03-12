@@ -508,7 +508,7 @@ private:
 void
 ReadOperation::Execute(NativeProcessLinux *monitor)
 {
-    lldb::pid_t pid = monitor->GetPID();
+    lldb::pid_t pid = monitor->GetID();
 
     m_result = DoReadMemory(pid, m_addr, m_buff, m_size, m_error);
 }
@@ -538,7 +538,7 @@ private:
 void
 WriteOperation::Execute(NativeProcessLinux *monitor)
 {
-    lldb::pid_t pid = monitor->GetPID();
+    lldb::pid_t pid = monitor->GetID();
 
     m_result = DoWriteMemory(pid, m_addr, m_buff, m_size, m_error);
 }
@@ -1002,7 +1002,7 @@ private:
 void
 KillOperation::Execute(NativeProcessLinux *monitor)
 {
-    lldb::pid_t pid = monitor->GetPID();
+    lldb::pid_t pid = monitor->GetID();
 
     if (PTRACE(PTRACE_KILL, pid, NULL, NULL, 0))
         m_result = false;
@@ -1240,7 +1240,6 @@ NativeProcessLinux::NativeProcessLinux (
     m_arch (module ? module->GetArchitecture () : ArchSpec ()),
     m_operation_thread (LLDB_INVALID_HOST_THREAD),
     m_monitor_thread (LLDB_INVALID_HOST_THREAD),
-    m_pid (LLDB_INVALID_PROCESS_ID),
     m_terminal_fd (-1),
     m_operation (0)
 {
@@ -1278,7 +1277,7 @@ WAIT_AGAIN:
 
     // Finally, start monitoring the child process for change in state.
     m_monitor_thread = Host::StartMonitoringChildProcess(
-        NativeProcessLinux::MonitorCallback, this, GetPID(), true);
+        NativeProcessLinux::MonitorCallback, this, GetID(), true);
     if (!IS_VALID_LLDB_HOST_THREAD(m_monitor_thread))
     {
         error.SetErrorToGenericError();
@@ -1296,7 +1295,6 @@ NativeProcessLinux::NativeProcessLinux (
     m_arch (),
     m_operation_thread (LLDB_INVALID_HOST_THREAD),
     m_monitor_thread (LLDB_INVALID_HOST_THREAD),
-    m_pid (LLDB_INVALID_PROCESS_ID),
     m_terminal_fd (-1),
     m_operation (0)
 {
@@ -1332,7 +1330,7 @@ WAIT_AGAIN:
 
     // Finally, start monitoring the child process for change in state.
     m_monitor_thread = Host::StartMonitoringChildProcess (
-        NativeProcessLinux::MonitorCallback, this, GetPID (), true);
+        NativeProcessLinux::MonitorCallback, this, GetID (), true);
     if (!IS_VALID_LLDB_HOST_THREAD (m_monitor_thread))
     {
         error.SetErrorToGenericError ();
@@ -1701,7 +1699,7 @@ NativeProcessLinux::MonitorCallback(void *callback_baton,
             log->Printf ("NativeProcessLinux::%s() got exit signal, tid = %"  PRIu64, __FUNCTION__, pid);
         message = ProcessMessage::Exit(pid, status);
         listener.OnMessage (message);
-        return pid == monitor->GetPID ();
+        return pid == monitor->GetID ();
     }
 
     if (!monitor->GetSignalInfo(pid, &info, ptrace_err)) {
@@ -1720,7 +1718,7 @@ NativeProcessLinux::MonitorCallback(void *callback_baton,
             if (log)
                 log->Printf ("NativeProcessLinux::%s() GetSignalInfo failed: %s, tid = %" PRIu64 ", signal = %d, status = %d", 
                               __FUNCTION__, strerror(ptrace_err), pid, signal, status);
-            stop_monitoring = (pid == monitor->GetPID ());
+            stop_monitoring = (pid == monitor->GetID ());
             // If we are going to stop monitoring, we need to notify our process object
             if (stop_monitoring)
             {
