@@ -2016,8 +2016,33 @@ NativeProcessLinux::Halt ()
     if (is_stopped)
         return error;
 
-    if (kill(GetID (), SIGSTOP) != 0)
-        error.SetErrorToErrno();
+    if (kill (GetID (), SIGSTOP) != 0)
+        error.SetErrorToErrno ();
+
+    return error;
+}
+
+Error
+NativeProcessLinux::Kill ()
+{
+    Error error;
+
+    // FIXME check if we've already exited
+    const bool has_exited = false;
+    if (has_exited)
+        return error;
+
+    // Drive the exit event to completion (do not keep the inferior in limbo).
+    // m_exit_now = true;
+
+    if (kill (GetID (), SIGKILL) != 0)
+    {
+        error.SetErrorToErrno ();
+        return error;
+    }
+
+    // FIXME keep track of us having exited
+    // SetPrivateState(eStateExited);
 
     return error;
 }
