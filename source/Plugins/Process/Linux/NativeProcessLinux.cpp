@@ -2007,7 +2007,23 @@ NativeProcessLinux::WaitForInitialTIDStop(lldb::tid_t tid)
 }
 
 Error
-NativeProcessLinux::AllocateMemory(
+NativeProcessLinux::Halt ()
+{
+    Error error;
+
+    // FIXME check if we're already stopped
+    const bool is_stopped = false;
+    if (is_stopped)
+        return error;
+
+    if (kill(GetID (), SIGSTOP) != 0)
+        error.SetErrorToErrno();
+
+    return error;
+}
+
+Error
+NativeProcessLinux::AllocateMemory (
     lldb::addr_t size,
     uint32_t permissions,
     lldb::addr_t &addr)
