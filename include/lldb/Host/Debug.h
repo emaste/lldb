@@ -197,7 +197,7 @@ namespace lldb_private {
             {
                 uint32_t signo;
             } signal;
-            
+
             // eStopTypeException
             struct
             {
@@ -212,40 +212,63 @@ namespace lldb_private {
     // NativeThreadProtocol
     //------------------------------------------------------------------
     class NativeThreadProtocol {
-        
+
     public:
-        NativeThreadProtocol (NativeProcessProtocol *process, lldb::tid_t tid) :
-            m_process (process),
-            m_tid (tid)
-        {
-        }
-        
+        NativeThreadProtocol (NativeProcessProtocol *process, lldb::tid_t tid);
+
         virtual ~NativeThreadProtocol()
         {
         }
-        virtual const char *GetName() = 0;
-        virtual lldb::StateType GetState () = 0;
-        virtual Error ReadRegister (uint32_t reg, RegisterValue &reg_value) = 0;
-        virtual Error WriteRegister (uint32_t reg, const RegisterValue &reg_value) = 0;
-        virtual Error SaveAllRegisters (lldb::DataBufferSP &data_sp) = 0;
-        virtual Error RestoreAllRegisters (lldb::DataBufferSP &data_sp) = 0;
-        virtual bool GetStopReason (ThreadStopInfo &stop_info) = 0;
-        
+
+        virtual const char *
+        GetName() = 0;
+
+        virtual lldb::StateType
+        GetState () = 0;
+
+        virtual lldb::RegisterContextNativeThreadSP
+        GetRegisterContext () = 0;
+
+        virtual Error
+        ReadRegister (uint32_t reg, RegisterValue &reg_value);
+
+        virtual Error
+        WriteRegister (uint32_t reg, const RegisterValue &reg_value);
+
+        virtual Error
+        SaveAllRegisters (lldb::DataBufferSP &data_sp) = 0;
+
+        virtual Error
+        RestoreAllRegisters (lldb::DataBufferSP &data_sp) = 0;
+
+        virtual bool
+        GetStopReason (ThreadStopInfo &stop_info) = 0;
+
         lldb::tid_t
         GetID() const
         {
             return m_tid;
         }
+
+        lldb::NativeProcessProtocolSP
+        GetProcess ()
+        {
+            return m_process_wp.lock ();
+        }
+
     protected:
-        NativeProcessProtocol *m_process;
+        lldb::NativeProcessProtocolWP m_process_wp;
         lldb::tid_t m_tid;
     };
 
-    
+
     //------------------------------------------------------------------
     // NativeProcessProtocol
     //------------------------------------------------------------------
-    class NativeProcessProtocol : public Broadcaster {
+    class NativeProcessProtocol :
+        public std::enable_shared_from_this<NativeProcessProtocol>,
+        public Broadcaster
+{
     public:
 
         enum class EventType
@@ -277,38 +300,67 @@ namespace lldb_private {
         virtual ~NativeProcessProtocol ()
         {
         }
-        
-        virtual Error Resume (const ResumeActionList &resume_actions) = 0;
-        virtual Error Halt () = 0;
-        virtual Error Detach () = 0;
-        virtual Error Signal (int signo) = 0;
-        virtual Error Kill () = 0;
-        
-        virtual Error ReadMemory (lldb::addr_t addr, void *buf, lldb::addr_t size, lldb::addr_t &bytes_read) = 0;
-        virtual Error WriteMemory (lldb::addr_t addr, const void *buf, lldb::addr_t size, lldb::addr_t &bytes_written) = 0;
-        virtual Error AllocateMemory (lldb::addr_t size, uint32_t permissions, lldb::addr_t &addr) = 0;
-        virtual Error DeallocateMemory (lldb::addr_t addr) = 0;
-        
-        virtual lldb::addr_t GetSharedLibraryInfoAddress () = 0;
-        
-        virtual bool IsAlive () = 0;
-        virtual size_t UpdateThreads () = 0;
-        virtual bool GetArchitecture (ArchSpec &arch) = 0;
+
+        virtual Error
+        Resume (const ResumeActionList &resume_actions) = 0;
+
+        virtual Error
+        Halt () = 0;
+
+        virtual Error
+        Detach () = 0;
+
+        virtual Error
+        Signal (int signo) = 0;
+
+        virtual Error
+        Kill () = 0;
+
+        virtual Error
+        ReadMemory (lldb::addr_t addr, void *buf, lldb::addr_t size, lldb::addr_t &bytes_read) = 0;
+
+        virtual Error
+        WriteMemory (lldb::addr_t addr, const void *buf, lldb::addr_t size, lldb::addr_t &bytes_written) = 0;
+
+        virtual Error
+        AllocateMemory (lldb::addr_t size, uint32_t permissions, lldb::addr_t &addr) = 0;
+
+        virtual Error
+        DeallocateMemory (lldb::addr_t addr) = 0;
+
+        virtual lldb::addr_t
+        GetSharedLibraryInfoAddress () = 0;
+
+        virtual bool
+        IsAlive () = 0;
+
+        virtual size_t
+        UpdateThreads () = 0;
+
+        virtual bool
+        GetArchitecture (ArchSpec &arch) = 0;
 
         //----------------------------------------------------------------------
         // Breakpoint functions
         //----------------------------------------------------------------------
-        virtual Error SetBreakpoint (lldb::addr_t addr, size_t size, bool hardware) = 0;
-        virtual Error RemoveBreakpoint (lldb::addr_t addr, size_t size) = 0;
-        
+        virtual Error
+        SetBreakpoint (lldb::addr_t addr, size_t size, bool hardware) = 0;
+
+        virtual Error
+        RemoveBreakpoint (lldb::addr_t addr, size_t size) = 0;
+
         //----------------------------------------------------------------------
         // Watchpoint functions
         //----------------------------------------------------------------------
-        virtual uint32_t GetMaxWatchpoints () = 0;
-        virtual Error SetWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags, bool hardware) = 0;
-        virtual Error RemoveWatchpoint (lldb::addr_t addr) = 0;
-        
-        
+        virtual uint32_t
+        GetMaxWatchpoints () = 0;
+
+        virtual Error
+        SetWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags, bool hardware) = 0;
+
+        virtual Error
+        RemoveWatchpoint (lldb::addr_t addr) = 0;
+
         //----------------------------------------------------------------------
         // Accessors
         //----------------------------------------------------------------------
@@ -335,19 +387,21 @@ namespace lldb_private {
         {
             return m_state == lldb::eStateStepping;
         }
-        
+
         bool
         CanResume () const
         {
             return m_state == lldb::eStateStopped;
         }
 
-        
         void
         SetState (lldb::StateType state)
         {
             m_state = state;
         }
+
+        bool
+        GetByteOrder (lldb::ByteOrder &byte_order);
 
         //----------------------------------------------------------------------
         // Exit Status

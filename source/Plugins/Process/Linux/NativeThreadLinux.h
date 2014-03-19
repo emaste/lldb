@@ -30,11 +30,11 @@ namespace lldb_private
         virtual lldb::StateType
         GetState ();
 
-        virtual Error
-        ReadRegister (uint32_t reg, RegisterValue &reg_value);
+        // virtual Error
+        // ReadRegister (uint32_t reg, RegisterValue &reg_value);
 
-        virtual Error
-        WriteRegister (uint32_t reg, const RegisterValue &reg_value);
+        // virtual Error
+        // WriteRegister (uint32_t reg, const RegisterValue &reg_value);
 
         virtual Error
         SaveAllRegisters (lldb::DataBufferSP &data_sp);
@@ -44,13 +44,6 @@ namespace lldb_private
 
         virtual bool
         GetStopReason (ThreadStopInfo &stop_info);
-
-    private:
-        NativeProcessLinux &
-        GetNativeProcessLinux ()
-        {
-            return *(reinterpret_cast<NativeProcessLinux*> (m_process));
-        }
     };
 }
 

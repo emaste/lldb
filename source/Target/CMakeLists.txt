@@ -19,6 +19,7 @@ add_lldb_library(lldbTarget
   QueueItem.cpp
   QueueList.cpp
   RegisterContext.cpp
+  RegisterContextNativeThread.cpp
   SectionLoadHistory.cpp
   SectionLoadList.cpp
   StackFrame.cpp

@@ -170,6 +170,7 @@ class   PythonObject;
 class   PythonString;
 class   RegisterCheckpoint;
 class   RegisterContext;
+class   RegisterContextNativeThread;
 class   RegisterLocation;
 class   RegisterLocationList;
 class   RegisterValue;
@@ -318,6 +319,7 @@ namespace lldb {
     typedef std::shared_ptr<lldb_private::Module> ModuleSP;
     typedef std::weak_ptr<lldb_private::Module> ModuleWP;
     typedef std::shared_ptr<lldb_private::NativeProcessProtocol> NativeProcessProtocolSP;
+    typedef std::weak_ptr<lldb_private::NativeProcessProtocol> NativeProcessProtocolWP;
     typedef std::shared_ptr<lldb_private::NativeThreadProtocol> NativeThreadProtocolSP;
     typedef std::shared_ptr<lldb_private::ObjectFile> ObjectFileSP;
     typedef std::weak_ptr<lldb_private::ObjectFile> ObjectFileWP;
@@ -348,6 +350,7 @@ namespace lldb {
     typedef std::shared_ptr<lldb_private::Property> PropertySP;
     typedef std::shared_ptr<lldb_private::RegisterCheckpoint> RegisterCheckpointSP;
     typedef std::shared_ptr<lldb_private::RegisterContext> RegisterContextSP;
+    typedef std::shared_ptr<lldb_private::RegisterContextNativeThread> RegisterContextNativeThreadSP;
     typedef std::shared_ptr<lldb_private::RegularExpression> RegularExpressionSP;
     typedef std::shared_ptr<lldb_private::Queue> QueueSP;
     typedef std::weak_ptr<lldb_private::Queue> QueueWP;

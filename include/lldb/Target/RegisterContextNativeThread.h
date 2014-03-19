@@ -1,4 +1,4 @@
-//===-- RegisterContext.h ---------------------------------------*- C++ -*-===//
+//===-- RegisterContextNativeThread.h ---------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,45 +7,47 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef liblldb_RegisterContext_h_
-#define liblldb_RegisterContext_h_
+#ifndef liblldb_RegisterContextNativeThread_h_
+#define liblldb_RegisterContextNativeThread_h_
 
 // C Includes
 // C++ Includes
 // Other libraries and framework includes
 // Project includes
 #include "lldb/lldb-private.h"
-#include "lldb/Target/ExecutionContextScope.h"
+// #include "lldb/Target/ExecutionContextScope.h"
 
 namespace lldb_private {
 
-class RegisterContext :
-    public std::enable_shared_from_this<RegisterContext>,
-    public ExecutionContextScope
+class NativeThreadProtocol;
+
+class RegisterContextNativeThread :
+    public std::enable_shared_from_this<RegisterContext>
+    // , public ExecutionContextScope
 {
 public:
     //------------------------------------------------------------------
     // Constructors and Destructors
     //------------------------------------------------------------------
-    RegisterContext (Thread &thread, uint32_t concrete_frame_idx);
+    RegisterContextNativeThread (NativeThreadProtocol &thread, uint32_t concrete_frame_idx);
 
     virtual
-    ~RegisterContext ();
+    ~RegisterContextNativeThread ();
 
-    void
-    InvalidateIfNeeded (bool force);
+    // void
+    // InvalidateIfNeeded (bool force);
 
     //------------------------------------------------------------------
     // Subclasses must override these functions
     //------------------------------------------------------------------
-    virtual void
-    InvalidateAllRegisters () = 0;
+    // virtual void
+    // InvalidateAllRegisters () = 0;
 
     virtual size_t
     GetRegisterCount () = 0;
 
     virtual const RegisterInfo *
-    GetRegisterInfoAtIndex (size_t reg) = 0;
+    GetRegisterInfoAtIndex (uint32_t reg) = 0;
 
     virtual size_t
     GetRegisterSetCount () = 0;
@@ -58,35 +60,32 @@ public:
 
     virtual bool
     WriteRegister (const RegisterInfo *reg_info, const RegisterValue &reg_value) = 0;
-    
+
     virtual bool
     ReadAllRegisterValues (lldb::DataBufferSP &data_sp)
     {
         return false;
     }
-    
+
     virtual bool
     WriteAllRegisterValues (const lldb::DataBufferSP &data_sp)
     {
         return false;
     }
 
-    // These two functions are used to implement "push" and "pop" of register states.  They are used primarily
-    // for expression evaluation, where we need to push a new state (storing the old one in data_sp) and then
-    // restoring the original state by passing the data_sp we got from ReadAllRegisters to WriteAllRegisterValues.
-    // ReadAllRegisters will do what is necessary to return a coherent set of register values for this thread, which
-    // may mean e.g. interrupting a thread that is sitting in a kernel trap.  That is a somewhat disruptive operation,
-    // so these API's should only be used when this behavior is needed.
-    
-    virtual bool
-    ReadAllRegisterValues (lldb_private::RegisterCheckpoint &reg_checkpoint);
-    
-    virtual bool
-    WriteAllRegisterValues (const lldb_private::RegisterCheckpoint &reg_checkpoint);
-    
-    bool
-    CopyFromRegisterContext (lldb::RegisterContextSP context);
-    
+    // // These two functions are used to implement "push" and "pop" of register states.  They are used primarily
+    // // for expression evaluation, where we need to push a new state (storing the old one in data_sp) and then
+    // // restoring the original state by passing the data_sp we got from ReadAllRegisters to WriteAllRegisterValues.
+    // // ReadAllRegisters will do what is necessary to return a coherent set of register values for this thread, which
+    // // may mean e.g. interrupting a thread that is sitting in a kernel trap.  That is a somewhat disruptive operation,
+    // // so these API's should only be used when this behavior is needed.
+
+    // virtual bool
+    // WriteAllRegisterValues (const lldb_private::RegisterCheckpoint &reg_checkpoint);
+
+    // bool
+    // CopyFromRegisterContext (lldb::RegisterContextSP context);
+
     virtual uint32_t
     ConvertRegisterKindToRegisterNumber (uint32_t kind, uint32_t num) = 0;
 
@@ -113,12 +112,12 @@ public:
 
     virtual bool
     HardwareSingleStep (bool enable);
-    
-    virtual Error
-    ReadRegisterValueFromMemory (const lldb_private::RegisterInfo *reg_info, lldb::addr_t src_addr, uint32_t src_len, RegisterValue &reg_value);
 
     virtual Error
-    WriteRegisterValueToMemory (const lldb_private::RegisterInfo *reg_info, lldb::addr_t dst_addr, uint32_t dst_len, const RegisterValue &reg_value);
+    ReadRegisterValueFromMemory (const lldb_private::RegisterInfo *reg_info, lldb::addr_t src_addr, lldb::addr_t src_len, RegisterValue &reg_value);
+
+    virtual Error
+    WriteRegisterValueToMemory (const lldb_private::RegisterInfo *reg_info, lldb::addr_t dst_addr, lldb::addr_t dst_len, const RegisterValue &reg_value);
 
     //------------------------------------------------------------------
     // Subclasses should not override these
@@ -126,7 +125,7 @@ public:
     virtual lldb::tid_t
     GetThreadID() const;
 
-    virtual Thread &
+    virtual NativeThreadProtocol &
     GetThread ()
     {
         return m_thread;
@@ -172,59 +171,60 @@ public:
 
     uint64_t
     ReadRegisterAsUnsigned (const RegisterInfo *reg_info, uint64_t fail_value);
-    
+
     bool
     WriteRegisterFromUnsigned (uint32_t reg, uint64_t uval);
 
     bool
     WriteRegisterFromUnsigned (const RegisterInfo *reg_info, uint64_t uval);
-    bool
-    ConvertBetweenRegisterKinds (int source_rk, uint32_t source_regnum, int target_rk, uint32_t& target_regnum);
 
-    //------------------------------------------------------------------
-    // lldb::ExecutionContextScope pure virtual functions
-    //------------------------------------------------------------------
-    virtual lldb::TargetSP
-    CalculateTarget ();
-    
-    virtual lldb::ProcessSP
-    CalculateProcess ();
-    
-    virtual lldb::ThreadSP
-    CalculateThread ();
-    
-    virtual lldb::StackFrameSP
-    CalculateStackFrame ();
+    // bool
+    // ConvertBetweenRegisterKinds (int source_rk, uint32_t source_regnum, int target_rk, uint32_t& target_regnum);
 
-    virtual void
-    CalculateExecutionContext (ExecutionContext &exe_ctx);
+    // //------------------------------------------------------------------
+    // // lldb::ExecutionContextScope pure virtual functions
+    // //------------------------------------------------------------------
+    // virtual lldb::TargetSP
+    // CalculateTarget ();
 
-    uint32_t
-    GetStopID () const
-    {
-        return m_stop_id;
-    }
+    // virtual lldb::ProcessSP
+    // CalculateProcess ();
 
-    void
-    SetStopID (uint32_t stop_id)
-    {
-        m_stop_id = stop_id;
-    }
+    // virtual lldb::ThreadSP
+    // CalculateThread ();
+
+    // virtual lldb::StackFrameSP
+    // CalculateStackFrame ();
+
+    // virtual void
+    // CalculateExecutionContext (ExecutionContext &exe_ctx);
+
+    // uint32_t
+    // GetStopID () const
+    // {
+    //     return m_stop_id;
+    // }
+
+    // void
+    // SetStopID (uint32_t stop_id)
+    // {
+    //     m_stop_id = stop_id;
+    // }
 
 protected:
     //------------------------------------------------------------------
     // Classes that inherit from RegisterContext can see and modify these
     //------------------------------------------------------------------
-    Thread &m_thread;               // The thread that this register context belongs to.
-    uint32_t m_concrete_frame_idx;    // The concrete frame index for this register context
-    uint32_t m_stop_id;             // The stop ID that any data in this context is valid for
+    NativeThreadProtocol &m_thread; // The thread that this register context belongs to.
+    uint32_t m_concrete_frame_idx;  // The concrete frame index for this register context
+    // uint32_t m_stop_id;             // The stop ID that any data in this context is valid for
 private:
     //------------------------------------------------------------------
     // For RegisterContext only
     //------------------------------------------------------------------
-    DISALLOW_COPY_AND_ASSIGN (RegisterContext);
+    DISALLOW_COPY_AND_ASSIGN (RegisterContextNativeThread);
 };
 
 } // namespace lldb_private
 
-#endif  // liblldb_RegisterContext_h_
+#endif  // liblldb_RegisterContextNativeThread_h_

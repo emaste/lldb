@@ -1243,13 +1243,8 @@ NativeProcessLinux::NativeProcessLinux (
     m_operation_thread (LLDB_INVALID_HOST_THREAD),
     m_monitor_thread (LLDB_INVALID_HOST_THREAD),
     m_terminal_fd (-1),
-    m_operation (0),
-    m_byte_order (lldb::endian::InlHostByteOrder())
+    m_operation (0)
 {
-    // Keep track of the byte order.
-    if (module && module->GetObjectFile())
-        m_byte_order = module->GetObjectFile()->GetByteOrder();
-
     std::unique_ptr<LaunchArgs> args(
         new LaunchArgs(
             this, module, argv, envp,
@@ -1305,8 +1300,7 @@ NativeProcessLinux::NativeProcessLinux (
     m_operation_thread (LLDB_INVALID_HOST_THREAD),
     m_monitor_thread (LLDB_INVALID_HOST_THREAD),
     m_terminal_fd (-1),
-    m_operation (0),
-    m_byte_order (lldb::endian::InlHostByteOrder())
+    m_operation (0)
 {
     sem_init (&m_operation_pending, 0, 0);
     sem_init (&m_operation_done, 0, 0);
@@ -2370,18 +2364,6 @@ NativeProcessLinux::WriteMemory(lldb::addr_t vm_addr, const void *buf, size_t si
     return result;
 }
 
-Error
-NativeProcessLinux::ReadRegister (lldb::tid_t tid, uint32_t reg, RegisterValue &reg_value)
-{
-    bool const result = ReadRegisterValue (
-        tid,
-        GetRegisterOffset (reg),
-        GetRegisterName (reg),
-        GetRegisterSize (reg),
-        reg_value);
-    return result ? Error () : Error ("NativeProcessLinux::%s () failed", __FUNCTION__);
-}
-
 bool
 NativeProcessLinux::ReadRegisterValue(lldb::tid_t tid, unsigned offset, const char* reg_name,
                                   unsigned size, RegisterValue &value)
@@ -2390,73 +2372,6 @@ NativeProcessLinux::ReadRegisterValue(lldb::tid_t tid, unsigned offset, const ch
     ReadRegOperation op(tid, offset, reg_name, value, result);
     DoOperation(&op);
     return result;
-}
-
-Error
-NativeProcessLinux::WriteRegister(
-    lldb::tid_t tid,
-    uint32_t reg,
-    const RegisterValue &value)
-{
-    unsigned reg_to_write = reg;
-    RegisterValue value_to_write = value;
-
-    // Check if this is a subregister of a full register.
-    const RegisterInfo *reg_info = GetRegisterInfoAtIndex (reg);
-    if (reg_info->invalidate_regs && (reg_info->invalidate_regs[0] != LLDB_INVALID_REGNUM))
-    {
-        RegisterValue full_value;
-        uint32_t full_reg = reg_info->invalidate_regs[0];
-        const RegisterInfo *full_reg_info = GetRegisterInfoAtIndex (full_reg);
-
-        // Read the full register.
-        Error error = ReadRegister (tid, full_reg, full_value);
-        if (error.Success ())
-        {
-            ByteOrder byte_order = GetByteOrder ();
-            uint8_t dst[RegisterValue::kMaxRegisterByteSize];
-
-            // Get the bytes for the full register.
-            const uint32_t dest_size = full_value.GetAsMemoryData (
-                full_reg_info,
-                dst,
-                sizeof(dst),
-                byte_order,
-                error);
-
-            if (error.Success () && dest_size)
-            {
-                uint8_t src[RegisterValue::kMaxRegisterByteSize];
-
-                // Get the bytes for the source data.
-                const uint32_t src_size = value.GetAsMemoryData (reg_info, src, sizeof(src), byte_order, error);
-                if (error.Success() && src_size && (src_size < dest_size))
-                {
-                    // Copy the src bytes to the destination.
-                    memcpy (dst + (reg_info->byte_offset & 0x1), src, src_size);
-                    // Set this full register as the value to write.
-                    value_to_write.SetBytes (dst, full_value.GetByteSize(), byte_order);
-                    value_to_write.SetType (full_reg_info);
-                    reg_to_write = full_reg;
-                }
-            }
-            else
-            {
-                return error;
-            }
-        }
-        else
-        {
-            return error;
-        }
-    }
-
-    const bool result = WriteRegisterValue(
-        tid,
-        GetRegisterOffset (reg_to_write),
-        GetRegisterName (reg_to_write),
-        value_to_write);
-    return result ? Error () : Error ("NativeProcessLinux::%s () failed", __FUNCTION__);    
 }
 
 bool

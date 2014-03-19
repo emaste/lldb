@@ -17,17 +17,10 @@ using namespace lldb_private;
 const char *
 NativeThreadLinux::GetName()
 {
-    return Host::GetThreadName (GetNativeProcessLinux ().GetID (), GetID ()).c_str ();
-}
+    lldb::NativeProcessProtocolSP process_sp = m_process_wp.lock ();
+    if (!process_sp)
+        return "<unknown: no process>";
 
-Error
-NativeThreadLinux::ReadRegister (uint32_t reg, RegisterValue &reg_value)
-{
-    return GetNativeProcessLinux ().ReadRegister (GetID (), reg, reg_value);
-}
-
-Error
-NativeThreadLinux::WriteRegister (uint32_t reg, const RegisterValue &reg_value)
-{
-    return GetNativeProcessLinux ().WriteRegister (GetID (), reg, reg_value);
+    // const NativeProcessLinux *const process = reinterpret_cast<NativeProcessLinux*> (process_sp->get ());
+    return Host::GetThreadName (process_sp->GetID (), GetID ()).c_str ();
 }

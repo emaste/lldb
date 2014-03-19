@@ -116,7 +116,7 @@ namespace lldb_private
             BroadcasterManager *broadcaster_manager,
             lldb::pid_t pid,
             lldb_private::Error &error);
-        
+
         ~NativeProcessLinux();
 
         enum ResumeSignals
@@ -169,10 +169,6 @@ namespace lldb_private
         WriteMemory(lldb::addr_t vm_addr, const void *buf, size_t size,
                 lldb_private::Error &error);
 
-        /// Implementation of the NativeThreadProtocol::ReadRegister() interface.
-        Error
-        ReadRegister (lldb::tid_t tid, uint32_t reg, RegisterValue &reg_value);
-
         /// Reads the contents from the register identified by the given (architecture
         /// dependent) offset.
         ///
@@ -180,10 +176,6 @@ namespace lldb_private
         bool
         ReadRegisterValue(lldb::tid_t tid, unsigned offset, const char *reg_name,
                 unsigned size, lldb_private::RegisterValue &value);
-
-        /// Implementation of the NativeThreadProtocol::WriteRegister() interface.
-        Error
-        WriteRegister(lldb::tid_t tid, uint32_t reg, const RegisterValue &value);
 
         /// Writes the given value to the register identified by the given
         /// (architecture dependent) offset.
@@ -309,8 +301,6 @@ namespace lldb_private
         sem_t m_operation_pending;
         sem_t m_operation_done;
 
-        lldb::ByteOrder m_byte_order;
-
         struct OperationArgs
         {
             OperationArgs(NativeProcessLinux *monitor);
@@ -430,31 +420,6 @@ namespace lldb_private
         /// Stops the operation thread used to attach/launch a process.
         void
         StopOpThread();
-
-        // ---------------------------------------------------------------------
-        // Register Info
-        //
-        // RegisterContextPOSIX_x86.h was almost good here but it
-        // depended on a Thread which isn't going to work for us in
-        // the remote scenario.
-        // ---------------------------------------------------------------------
-        unsigned
-        GetRegisterOffset(uint32_t reg);
-
-        const char *
-        GetRegisterName(uint32_t reg);
-
-        unsigned
-        GetRegisterSize(uint32_t reg);
-
-        const lldb_private::RegisterInfo *
-        GetRegisterInfoAtIndex (uint32_t reg);
-
-        lldb::ByteOrder
-        GetByteOrder()
-        {
-            return m_byte_order;
-        }
     };
 
 } // End lldb_private namespace.
