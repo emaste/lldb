@@ -153,14 +153,6 @@ namespace lldb_private
         int
         GetTerminalFD() const { return m_terminal_fd; }
 
-        /// Reads @p size bytes from address @vm_adder in the inferior process
-        /// address space.
-        ///
-        /// This method is provided to implement Process::DoReadMemory.
-        size_t
-        ReadMemory(lldb::addr_t vm_addr, void *buf, size_t size,
-                lldb_private::Error &error);
-
         /// Writes @p size bytes from address @p vm_adder in the inferior process
         /// address space.
         ///
@@ -266,7 +258,9 @@ namespace lldb_private
         virtual Error Signal (int signo);
         virtual Error Kill ();
 
-        virtual Error ReadMemory (lldb::addr_t addr, void *buf, lldb::addr_t size, lldb::addr_t &bytes_read);
+        virtual Error
+        ReadMemory (lldb::addr_t addr, void *buf, lldb::addr_t size, lldb::addr_t &bytes_read);
+
         virtual Error WriteMemory (lldb::addr_t addr, const void *buf, lldb::addr_t size, lldb::addr_t &bytes_written);
         virtual Error AllocateMemory (lldb::addr_t size, uint32_t permissions, lldb::addr_t &addr);
         virtual Error DeallocateMemory (lldb::addr_t addr);

@@ -304,15 +304,19 @@ using namespace lldb_private;
 // NativeProcessLinux::WriteMemory.  This enables mutual recursion between these
 // functions without needed to go thru the thread funnel.
 
-static size_t
-DoReadMemory(lldb::pid_t pid,
-             lldb::addr_t vm_addr, void *buf, size_t size, Error &error)
+static lldb::addr_t
+DoReadMemory (
+    lldb::pid_t pid,
+    lldb::addr_t vm_addr,
+    void *buf,
+    lldb::addr_t size,
+    Error &error)
 {
     // ptrace word size is determined by the host, not the child
     static const unsigned word_size = sizeof(void*);
     unsigned char *dst = static_cast<unsigned char*>(buf);
-    size_t bytes_read;
-    size_t remainder;
+    lldb::addr_t bytes_read;
+    lldb::addr_t remainder;
     long data;
 
     Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_ALL));
@@ -491,28 +495,36 @@ public:
 class ReadOperation : public Operation
 {
 public:
-    ReadOperation(lldb::addr_t addr, void *buff, size_t size,
-                  Error &error, size_t &result)
-        : m_addr(addr), m_buff(buff), m_size(size),
-          m_error(error), m_result(result)
-        { }
+    ReadOperation (
+        lldb::addr_t addr,
+        void *buff,
+        lldb::addr_t size,
+        size_t &result) :
+        m_addr(addr),
+        m_buff(buff),
+        m_size(size),
+        m_error(),
+        m_result(result)
+    {
+    }
 
-    void Execute(NativeProcessLinux *monitor);
+    void Execute (NativeProcessLinux *monitor);
+
+    const Error &
+    GetError () const { return m_error; }
 
 private:
     lldb::addr_t m_addr;
     void *m_buff;
-    size_t m_size;
-    Error &m_error;
-    size_t &m_result;
+    lldb::addr_t m_size;
+    Error m_error;
+    lldb::addr_t &m_result;
 };
 
 void
-ReadOperation::Execute(NativeProcessLinux *monitor)
+ReadOperation::Execute (NativeProcessLinux *process)
 {
-    lldb::pid_t pid = monitor->GetID();
-
-    m_result = DoReadMemory(pid, m_addr, m_buff, m_size, m_error);
+    m_result = DoReadMemory (process->GetID (), m_addr, m_buff, m_size, m_error);
 }
 
 //------------------------------------------------------------------------------
@@ -2344,14 +2356,12 @@ NativeProcessLinux::DoOperation(Operation *op)
     }
 }
 
-size_t
-NativeProcessLinux::ReadMemory(lldb::addr_t vm_addr, void *buf, size_t size,
-                           Error &error)
+Error
+NativeProcessLinux::ReadMemory (lldb::addr_t addr, void *buf, lldb::addr_t size, lldb::addr_t &bytes_read)
 {
-    size_t result;
-    ReadOperation op(vm_addr, buf, size, error, result);
+    ReadOperation op(addr, buf, size, bytes_read);
     DoOperation(&op);
-    return result;
+    return op.GetError ();
 }
 
 size_t
