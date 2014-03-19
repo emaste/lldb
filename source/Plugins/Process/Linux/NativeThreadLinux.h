@@ -24,26 +24,20 @@ namespace lldb_private
         // ---------------------------------------------------------------------
         // NativeThreadProtocol Interface
         // ---------------------------------------------------------------------
-        virtual const char *
-        GetName();
+        const char *
+        GetName() override;
 
-        virtual lldb::StateType
-        GetState ();
+        lldb::StateType
+        GetState () override;
 
-        // virtual Error
-        // ReadRegister (uint32_t reg, RegisterValue &reg_value);
+        Error
+        SaveAllRegisters (lldb::DataBufferSP &data_sp) override;
 
-        // virtual Error
-        // WriteRegister (uint32_t reg, const RegisterValue &reg_value);
+        Error
+        RestoreAllRegisters (lldb::DataBufferSP &data_sp) override;
 
-        virtual Error
-        SaveAllRegisters (lldb::DataBufferSP &data_sp);
-
-        virtual Error
-        RestoreAllRegisters (lldb::DataBufferSP &data_sp);
-
-        virtual bool
-        GetStopReason (ThreadStopInfo &stop_info);
+        bool
+        GetStopReason (ThreadStopInfo &stop_info) override;
     };
 }
 

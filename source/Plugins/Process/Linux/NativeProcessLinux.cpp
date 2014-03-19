@@ -368,21 +368,25 @@ DoReadMemory (
     return bytes_read;
 }
 
-static size_t
-DoWriteMemory(lldb::pid_t pid,
-              lldb::addr_t vm_addr, const void *buf, size_t size, Error &error)
+static lldb::addr_t
+DoWriteMemory(
+    lldb::pid_t pid,
+    lldb::addr_t vm_addr,
+    const void *buf,
+    lldb::addr_t size,
+    Error &error)
 {
     // ptrace word size is determined by the host, not the child
     static const unsigned word_size = sizeof(void*);
     const unsigned char *src = static_cast<const unsigned char*>(buf);
-    size_t bytes_written = 0;
-    size_t remainder;
+    lldb::addr_t bytes_written = 0;
+    lldb::addr_t remainder;
 
     Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_ALL));
     if (log)
         ProcessPOSIXLog::IncNestLevel();
     if (log && ProcessPOSIXLog::AtTopNestLevel() && log->GetMask().Test(POSIX_LOG_MEMORY))
-        log->Printf ("NativeProcessLinux::%s(%" PRIu64 ", %d, %p, %p, %zd, _)", __FUNCTION__,
+        log->Printf ("NativeProcessLinux::%s(%" PRIu64 ", %u, %p, %p, %" PRIu64 ")", __FUNCTION__,
                      pid, word_size, (void*)vm_addr, buf, size);
 
     for (bytes_written = 0; bytes_written < size; bytes_written += remainder)
@@ -485,8 +489,19 @@ EnsureFDFlags(int fd, int flags, Error &error)
 class lldb_private::Operation
 {
 public:
-    virtual ~Operation() {}
-    virtual void Execute(NativeProcessLinux *monitor) = 0;
+    Operation () : m_error() { }
+
+    virtual
+    ~Operation() {}
+
+    virtual void
+    Execute (NativeProcessLinux *process) = 0;
+
+    const Error &
+    GetError () const { return m_error; }
+
+protected:
+    Error m_error;
 };
 
 //------------------------------------------------------------------------------
@@ -500,24 +515,20 @@ public:
         void *buff,
         lldb::addr_t size,
         size_t &result) :
-        m_addr(addr),
-        m_buff(buff),
-        m_size(size),
-        m_error(),
-        m_result(result)
+        Operation (),
+        m_addr (addr),
+        m_buff (buff),
+        m_size (size),
+        m_result (result)
     {
     }
 
-    void Execute (NativeProcessLinux *monitor);
-
-    const Error &
-    GetError () const { return m_error; }
+    void Execute (NativeProcessLinux *process) override;
 
 private:
     lldb::addr_t m_addr;
     void *m_buff;
     lldb::addr_t m_size;
-    Error m_error;
     lldb::addr_t &m_result;
 };
 
@@ -533,30 +544,33 @@ ReadOperation::Execute (NativeProcessLinux *process)
 class WriteOperation : public Operation
 {
 public:
-    WriteOperation(lldb::addr_t addr, const void *buff, size_t size,
-                   Error &error, size_t &result)
-        : m_addr(addr), m_buff(buff), m_size(size),
-          m_error(error), m_result(result)
-        { }
+    WriteOperation (
+        lldb::addr_t addr,
+        const void *buff,
+        lldb::addr_t size,
+        lldb::addr_t &result) :
+        Operation (),
+        m_addr (addr),
+        m_buff (buff),
+        m_size (size),
+        m_result (result)
+    {
+    }
 
-    void Execute(NativeProcessLinux *monitor);
+    void Execute (NativeProcessLinux *process) override;
 
 private:
     lldb::addr_t m_addr;
     const void *m_buff;
-    size_t m_size;
-    Error &m_error;
-    size_t &m_result;
+    lldb::addr_t m_size;
+    lldb::addr_t m_result;
 };
 
 void
-WriteOperation::Execute(NativeProcessLinux *monitor)
+WriteOperation::Execute(NativeProcessLinux *process)
 {
-    lldb::pid_t pid = monitor->GetID();
-
-    m_result = DoWriteMemory(pid, m_addr, m_buff, m_size, m_error);
+    m_result = DoWriteMemory (process->GetID (), m_addr, m_buff, m_size, m_error);
 }
-
 
 //------------------------------------------------------------------------------
 /// @class ReadRegOperation
@@ -2364,14 +2378,12 @@ NativeProcessLinux::ReadMemory (lldb::addr_t addr, void *buf, lldb::addr_t size,
     return op.GetError ();
 }
 
-size_t
-NativeProcessLinux::WriteMemory(lldb::addr_t vm_addr, const void *buf, size_t size,
-                            lldb_private::Error &error)
+Error
+NativeProcessLinux::WriteMemory (lldb::addr_t addr, const void *buf, lldb::addr_t size, lldb::addr_t &bytes_written)
 {
-    size_t result;
-    WriteOperation op(vm_addr, buf, size, error, result);
+    WriteOperation op(addr, buf, size, bytes_written);
     DoOperation(&op);
-    return result;
+    return op.GetError ();
 }
 
 bool

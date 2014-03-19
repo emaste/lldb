@@ -153,14 +153,6 @@ namespace lldb_private
         int
         GetTerminalFD() const { return m_terminal_fd; }
 
-        /// Writes @p size bytes from address @p vm_adder in the inferior process
-        /// address space.
-        ///
-        /// This method is provided to implement Process::DoWriteMemory.
-        size_t
-        WriteMemory(lldb::addr_t vm_addr, const void *buf, size_t size,
-                lldb_private::Error &error);
-
         /// Reads the contents from the register identified by the given (architecture
         /// dependent) offset.
         ///
@@ -252,31 +244,59 @@ namespace lldb_private
         // ---------------------------------------------------------------------
         // NativeProcessProtocol Interface
         // ---------------------------------------------------------------------
-        virtual Error Resume (const ResumeActionList &resume_actions);
-        virtual Error Halt ();
-        virtual Error Detach ();
-        virtual Error Signal (int signo);
-        virtual Error Kill ();
+        Error
+        Resume (const ResumeActionList &resume_actions) override;
 
-        virtual Error
-        ReadMemory (lldb::addr_t addr, void *buf, lldb::addr_t size, lldb::addr_t &bytes_read);
+        Error
+        Halt () override;
 
-        virtual Error WriteMemory (lldb::addr_t addr, const void *buf, lldb::addr_t size, lldb::addr_t &bytes_written);
-        virtual Error AllocateMemory (lldb::addr_t size, uint32_t permissions, lldb::addr_t &addr);
-        virtual Error DeallocateMemory (lldb::addr_t addr);
+        Error
+        Detach () override;
 
-        virtual lldb::addr_t GetSharedLibraryInfoAddress ();
+        Error
+        Signal (int signo) override;
 
-        virtual bool IsAlive ();
-        virtual size_t UpdateThreads ();
-        virtual bool GetArchitecture (ArchSpec &arch);
+        Error
+        Kill () override;
 
-        virtual Error SetBreakpoint (lldb::addr_t addr, size_t size, bool hardware);
-        virtual Error RemoveBreakpoint (lldb::addr_t addr, size_t size);
+        Error
+        ReadMemory (lldb::addr_t addr, void *buf, lldb::addr_t size, lldb::addr_t &bytes_read) override;
 
-        virtual uint32_t GetMaxWatchpoints ();
-        virtual Error SetWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags, bool hardware);
-        virtual Error RemoveWatchpoint (lldb::addr_t addr);
+        Error
+        WriteMemory (lldb::addr_t addr, const void *buf, lldb::addr_t size, lldb::addr_t &bytes_written) override;
+
+        Error
+        AllocateMemory (lldb::addr_t size, uint32_t permissions, lldb::addr_t &addr) override;
+
+        Error
+        DeallocateMemory (lldb::addr_t addr) override;
+
+        lldb::addr_t
+        GetSharedLibraryInfoAddress () override;
+
+        bool
+        IsAlive () override;
+
+        size_t
+        UpdateThreads () override;
+
+        bool
+        GetArchitecture (ArchSpec &arch) override;
+
+        Error
+        SetBreakpoint (lldb::addr_t addr, size_t size, bool hardware) override;
+
+        Error
+        RemoveBreakpoint (lldb::addr_t addr, size_t size) override;
+
+        uint32_t
+        GetMaxWatchpoints () override;
+
+        Error
+        SetWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags, bool hardware) override;
+
+        Error
+        RemoveWatchpoint (lldb::addr_t addr) override;
 
     private:
         Listener *m_listener;
