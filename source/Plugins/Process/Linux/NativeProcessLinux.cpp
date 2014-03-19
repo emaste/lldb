@@ -828,20 +828,26 @@ WriteRegisterSetOperation::Execute(NativeProcessLinux *monitor)
 class ReadThreadPointerOperation : public Operation
 {
 public:
-    ReadThreadPointerOperation(lldb::tid_t tid, lldb::addr_t *addr, bool &result)
-        : m_tid(tid), m_addr(addr), m_result(result)
+    ReadThreadPointerOperation(lldb::tid_t tid, lldb::addr_t *addr, bool &result, const ArchSpec &arch) :
+        Operation (),
+        m_tid (tid),
+        m_addr(addr),
+        m_result(result),
+        m_arch (arch)
         { }
 
-    void Execute(NativeProcessLinux *monitor);
+    void
+    Execute(NativeProcessLinux *process) override;
 
 private:
     lldb::tid_t m_tid;
     lldb::addr_t *m_addr;
     bool &m_result;
+    const ArchSpec &m_arch;
 };
 
 void
-ReadThreadPointerOperation::Execute(NativeProcessLinux *monitor)
+ReadThreadPointerOperation::Execute(NativeProcessLinux *process)
 {
     Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_REGISTERS));
     if (log)
@@ -851,8 +857,7 @@ ReadThreadPointerOperation::Execute(NativeProcessLinux *monitor)
     // somewhat... obscure. There's several different ways depending on
     // what arch you're on, and what kernel version you have.
 
-    const ArchSpec& arch = monitor->GetArchitecture();
-    switch(arch.GetMachine())
+    switch(m_arch.GetMachine())
     {
     case llvm::Triple::x86:
     {
@@ -2001,6 +2006,57 @@ NativeProcessLinux::WaitForInitialTIDStop(lldb::tid_t tid)
     return false;
 }
 
+Error
+NativeProcessLinux::AllocateMemory(
+    lldb::addr_t size,
+    uint32_t permissions,
+    lldb::addr_t &addr)
+{
+    // FIXME implementing this requires the equivalent of
+    // InferiorCallPOSIX::InferiorCallMmap, which depends on
+    // functional ThreadPlans working with Native*Protocol.
+#if 1
+    return Error ("not implemented yet");
+#else
+    addr = LLDB_INVALID_ADDRESS;
+
+    unsigned prot = 0;
+    if (permissions & lldb::ePermissionsReadable)
+        prot |= eMmapProtRead;
+    if (permissions & lldb::ePermissionsWritable)
+        prot |= eMmapProtWrite;
+    if (permissions & lldb::ePermissionsExecutable)
+        prot |= eMmapProtExec;
+
+    // TODO implement this directly in NativeProcessLinux
+    // (and lift to NativeProcessPOSIX if/when that class is
+    // refactored out).
+    if (InferiorCallMmap(this, addr, 0, size, prot,
+                         eMmapFlagsAnon | eMmapFlagsPrivate, -1, 0)) {
+        m_addr_to_mmap_size[addr] = size;
+        return Error ();
+    } else {
+        addr = LLDB_INVALID_ADDRESS;
+        return Error("unable to allocate %" PRIu64 " bytes of memory with permissions %s", size, GetPermissionsAsCString (permissions));
+    }
+#endif
+}
+
+Error
+NativeProcessLinux::DeallocateMemory (lldb::addr_t addr)
+{
+    // FIXME see comments in AllocateMemory - required lower-level
+    // bits not in place yet (ThreadPlans)
+    return Error ("not implemented");
+}
+
+bool
+NativeProcessLinux::GetArchitecture (ArchSpec &arch)
+{
+    arch = m_arch;
+    return true;
+}
+
 bool
 NativeProcessLinux::StopThread(lldb::tid_t tid)
 {
@@ -2464,7 +2520,7 @@ bool
 NativeProcessLinux::ReadThreadPointer(lldb::tid_t tid, lldb::addr_t &value)
 {
     bool result;
-    ReadThreadPointerOperation op(tid, &value, result);
+    ReadThreadPointerOperation op(tid, &value, result, m_arch);
     DoOperation(&op);
     return result;
 }

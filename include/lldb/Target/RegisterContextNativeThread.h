@@ -105,7 +105,7 @@ public:
     NumSupportedHardwareWatchpoints ();
 
     virtual uint32_t
-    SetHardwareWatchpoint (lldb::addr_t addr, size_t size, bool read, bool write);
+    SetHardwareWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags);
 
     virtual bool
     ClearHardwareWatchpoint (uint32_t hw_index);

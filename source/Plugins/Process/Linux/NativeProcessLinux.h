@@ -128,10 +128,6 @@ namespace lldb_private
         Listener&
         GetListener () { return *m_listener; }
 
-        /// Returns the architecture of the process being monitored.
-        const lldb_private::ArchSpec&
-        GetArchitecture () const { return m_arch; }
-
         /// Set the architecture for the process.  This is done only
         /// on attach. For a process started by the process monitor,
         /// the architecture is already known.
@@ -288,15 +284,6 @@ namespace lldb_private
 
         Error
         RemoveBreakpoint (lldb::addr_t addr, size_t size) override;
-
-        uint32_t
-        GetMaxWatchpoints () override;
-
-        Error
-        SetWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags, bool hardware) override;
-
-        Error
-        RemoveWatchpoint (lldb::addr_t addr) override;
 
     private:
         Listener *m_listener;

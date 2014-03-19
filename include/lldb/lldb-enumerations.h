@@ -753,6 +753,17 @@ namespace lldb {
         eQueueKindConcurrent
     } QueueKind;
 
+    //----------------------------------------------------------------------
+    // Watchpoint Kind
+    // Indicates what types of events cause the watchpoint to fire.
+    // Used by Native*Protocol-related classes.
+    //----------------------------------------------------------------------
+    typedef enum WatchpointKind
+    {
+        eWatchpointKindRead = (1u << 0),
+        eWatchpointKindWrite = (1u << 1)
+    } WatchpointKind;
+
 } // namespace lldb
 
 

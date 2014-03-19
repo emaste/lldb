@@ -294,7 +294,7 @@ RegisterContextNativeThread::NumSupportedHardwareWatchpoints ()
 }
 
 uint32_t
-RegisterContextNativeThread::SetHardwareWatchpoint (lldb::addr_t addr, size_t size, bool read, bool write)
+RegisterContextNativeThread::SetHardwareWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags)
 {
     return LLDB_INVALID_INDEX32;
 }

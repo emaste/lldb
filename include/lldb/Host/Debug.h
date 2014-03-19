@@ -18,7 +18,7 @@
 #include <vector>
 
 namespace lldb_private {
-    
+
     //------------------------------------------------------------------
     // Tells a thread what it needs to do when the process is resumed.
     //------------------------------------------------------------------
@@ -28,7 +28,7 @@ namespace lldb_private {
         lldb::StateType state;  // Valid values are eStateStopped/eStateSuspended, eStateRunning, and eStateStepping.
         int signal;             // When resuming this thread, resume it with this signal if this value is > 0
     };
-    
+
     //------------------------------------------------------------------
     // A class that contains instructions for all threads for
     // NativeProcessProtocol::Resume(). Each thread can either run, stay
@@ -44,15 +44,14 @@ namespace lldb_private {
             m_signal_handled ()
         {
         }
-        
+
         ResumeActionList (lldb::StateType default_action, int signal) :
             m_actions(),
             m_signal_handled ()
         {
             SetDefaultThreadActionIfNeeded (default_action, signal);
         }
-        
-        
+
         ResumeActionList (const ResumeAction *actions, size_t num_actions) :
             m_actions (),
             m_signal_handled ()
@@ -63,7 +62,7 @@ namespace lldb_private {
                 m_signal_handled.assign (num_actions, false);
             }
         }
-        
+
         ~ResumeActionList()
         {
         }
@@ -73,14 +72,14 @@ namespace lldb_private {
         {
             return m_actions.empty();
         }
-        
+
         void
         Append (const ResumeAction &action)
         {
             m_actions.push_back (action);
             m_signal_handled.push_back (false);
         }
-        
+
         void
         AppendAction (lldb::tid_t tid,
                       lldb::StateType state,
@@ -89,25 +88,25 @@ namespace lldb_private {
             ResumeAction action = { tid, state, signal };
             Append (action);
         }
-        
+
         void
         AppendResumeAll ()
         {
             AppendAction (LLDB_INVALID_THREAD_ID, lldb::eStateRunning);
         }
-        
+
         void
         AppendSuspendAll ()
         {
             AppendAction (LLDB_INVALID_THREAD_ID, lldb::eStateStopped);
         }
-        
+
         void
         AppendStepAll ()
         {
             AppendAction (LLDB_INVALID_THREAD_ID, lldb::eStateStepping);
         }
-        
+
         const ResumeAction *
         GetActionForThread (lldb::tid_t tid, bool default_ok) const
         {
@@ -121,7 +120,7 @@ namespace lldb_private {
                 return GetActionForThread (LLDB_INVALID_THREAD_ID, false);
             return NULL;
         }
-        
+
         size_t
         NumActionsWithState (lldb::StateType state) const
         {
@@ -134,7 +133,7 @@ namespace lldb_private {
             }
             return count;
         }
-        
+
         bool
         SetDefaultThreadActionIfNeeded (lldb::StateType action, int signal)
         {
@@ -148,7 +147,7 @@ namespace lldb_private {
             }
             return false;
         }
-        
+
         void
         SetSignalHandledForThread (lldb::tid_t tid) const
         {
@@ -162,26 +161,26 @@ namespace lldb_private {
                 }
             }
         }
-        
+
         const ResumeAction *
         GetFirst() const
         {
             return m_actions.data();
         }
-        
+
         size_t
         GetSize () const
         {
             return m_actions.size();
         }
-        
+
         void
         Clear()
         {
             m_actions.clear();
             m_signal_handled.clear();
         }
-        
+
     protected:
         std::vector<ResumeAction> m_actions;
         mutable std::vector<bool> m_signal_handled;
@@ -255,6 +254,15 @@ namespace lldb_private {
         {
             return m_process_wp.lock ();
         }
+
+        // ---------------------------------------------------------------------
+        // Thread-specific watchpoints
+        // ---------------------------------------------------------------------
+        virtual Error
+        SetWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags, bool hardware) = 0;
+
+        virtual Error
+        RemoveWatchpoint (lldb::addr_t addr) = 0;
 
     protected:
         lldb::NativeProcessProtocolWP m_process_wp;
@@ -353,13 +361,13 @@ namespace lldb_private {
         // Watchpoint functions
         //----------------------------------------------------------------------
         virtual uint32_t
-        GetMaxWatchpoints () = 0;
+        GetMaxWatchpoints () const;
 
         virtual Error
-        SetWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags, bool hardware) = 0;
+        SetWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags, bool hardware);
 
         virtual Error
-        RemoveWatchpoint (lldb::addr_t addr) = 0;
+        RemoveWatchpoint (lldb::addr_t addr);
 
         //----------------------------------------------------------------------
         // Accessors
@@ -369,19 +377,19 @@ namespace lldb_private {
         {
             return m_pid;
         }
-        
+
         lldb::StateType
         GetState () const
         {
             return m_state;
         }
-        
+
         bool
         IsRunning () const
         {
             return m_state == lldb::eStateRunning || IsStepping();
         }
-        
+
         bool
         IsStepping () const
         {
