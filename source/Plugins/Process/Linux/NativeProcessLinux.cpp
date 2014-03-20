@@ -2091,6 +2091,17 @@ NativeProcessLinux::DeallocateMemory (lldb::addr_t addr)
     return Error ("not implemented");
 }
 
+size_t
+NativeProcessLinux::UpdateThreads ()
+{
+    // The NativeProcessLinux monitoring threads are always up to date
+    // with respect to thread state and they keep the thread list
+    // populated properly. All this method needs to do is return the
+    // thread count.
+    Mutex::Locker locker (m_threads_mutex);
+    return m_threads.size ();
+}
+
 bool
 NativeProcessLinux::GetArchitecture (ArchSpec &arch)
 {
