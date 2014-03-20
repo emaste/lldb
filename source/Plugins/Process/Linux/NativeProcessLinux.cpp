@@ -2023,6 +2023,13 @@ NativeProcessLinux::Halt ()
 }
 
 Error
+NativeProcessLinux::Detach ()
+{
+    StopMonitor ();
+    return Error ();
+}
+
+Error
 NativeProcessLinux::Kill ()
 {
     Error error;
@@ -2673,6 +2680,7 @@ NativeProcessLinux::StopMonitor()
     sem_destroy(&m_operation_pending);
     sem_destroy(&m_operation_done);
 
+    // TODO: validate whether this still holds, fix up comment.
     // Note: ProcessPOSIX passes the m_terminal_fd file descriptor to
     // Process::SetSTDIOFileDescriptor, which in turn transfers ownership of
     // the descriptor to a ConnectionFileDescriptor object.  Consequently
