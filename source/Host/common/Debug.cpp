@@ -118,6 +118,12 @@ NativeProcessProtocol::SetWatchpoint (lldb::addr_t addr, size_t size, uint32_t w
     // Update the thread list
     UpdateThreads ();
 
+    // Keep track of the threads we successfully set the watchpoint
+    // for.  If one of the thread watchpoint setting operations fails,
+    // back off and remove the watchpoint for all the threads that
+    // were successfully set so we get back to a consistent state.
+    std::vector<NativeThreadProtocolSP> watchpoint_established_threads;
+
     // Tell each thread to set a watchpoint.  In the event that
     // hardware watchpoints are requested but the SetWatchpoint fails,
     // try to set a software watchpoint as a fallback.  It's
@@ -143,8 +149,30 @@ NativeProcessProtocol::SetWatchpoint (lldb::addr_t addr, size_t size, uint32_t w
                     log->Warning ("hardware watchpoint requested but software watchpoint set"); 
             }
         }
-        if (thread_error.Fail ())
+
+        if (thread_error.Success ())
+        {
+            // Remember that we set this watchpoint successfully in
+            // case we need to clear it later.
+            watchpoint_established_threads.push_back (thread_sp);
+        }
+        else
+        {
+            // Unset the watchpoint for each thread we successfully
+            // set so that we get back to a consistent state of "not
+            // set" for the watchpoint.
+            for (auto unwatch_thread_sp : watchpoint_established_threads)
+            {
+                Error remove_error = unwatch_thread_sp->RemoveWatchpoint (addr);
+                if (remove_error.Fail () && log)
+                {
+                    log->Warning ("NativeProcessProtocol::%s (): RemoveWatchpoint failed for pid=%" PRIu64 ", tid=%" PRIu64 ": %s",
+                            __FUNCTION__, GetID (), unwatch_thread_sp->GetID (), remove_error.AsCString ());
+                }
+            }
+
             return thread_error;
+        }
     }
     return Error ();
 }
