@@ -18,6 +18,8 @@ namespace lldb_private
 
     class NativeThreadLinux : public NativeThreadProtocol
     {
+        friend class NativeProcessLinux;
+
     public:
         NativeThreadLinux (NativeProcessLinux *process, lldb::tid_t tid);
 
@@ -38,6 +40,34 @@ namespace lldb_private
 
         bool
         GetStopReason (ThreadStopInfo &stop_info) override;
+
+    private:
+        // ---------------------------------------------------------------------
+        // Interface for friend classes
+        // ---------------------------------------------------------------------
+        void
+        SetRunning ();
+
+        void
+        SetStepping ();
+
+        void
+        SetStopped ();
+
+        void
+        SetSuspended ();
+
+        // ---------------------------------------------------------------------
+        // Private interface
+        // ---------------------------------------------------------------------
+        void
+        MaybeLogStateChange (lldb::StateType new_state);
+
+        // ---------------------------------------------------------------------
+        // Member Variables
+        // ---------------------------------------------------------------------
+        lldb::StateType m_state;
+
     };
 }
 

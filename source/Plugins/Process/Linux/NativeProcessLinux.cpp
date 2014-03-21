@@ -31,6 +31,7 @@
 #include "lldb/Core/Module.h"
 #include "lldb/Core/RegisterValue.h"
 #include "lldb/Core/Scalar.h"
+#include "lldb/Core/State.h"
 #include "lldb/Host/Host.h"
 #include "lldb/Symbol/ObjectFile.h"
 #include "lldb/Target/Thread.h"
@@ -2004,6 +2005,45 @@ NativeProcessLinux::WaitForInitialTIDStop(lldb::tid_t tid)
         return true;
     }
     return false;
+}
+
+Error
+NativeProcessLinux::Resume (const ResumeActionList &resume_actions)
+{
+    Mutex::Locker locker (m_threads_mutex);
+    for (auto thread_sp : m_threads)
+    {
+        assert (thread_sp && "thread list should not contain NULL threads");
+        NativeThreadLinux *const linux_thread_p = reinterpret_cast<NativeThreadLinux*> (thread_sp.get ());
+
+        const ResumeAction *const action = resume_actions.GetActionForThread (thread_sp->GetID (), true);
+        assert (action && "NULL ResumeAction returned for thread during Resume ()");
+
+        switch (action->state)
+        {
+        case eStateRunning:
+            // Run the thread, possibly feeding it the signal.
+            linux_thread_p->SetRunning ();
+            Resume (thread_sp->GetID (), (action->signal > 0) ? action->signal : LLDB_INVALID_SIGNAL_NUMBER);
+            break;
+        case eStateStepping:
+            // Keep the thread inactive.
+            linux_thread_p->SetStepping ();
+            break;
+        case eStateStopped:
+            // Keep the thread inactive.
+            linux_thread_p->SetStopped ();
+            break;
+        case eStateSuspended:
+            // Keep the thread inactive.
+            linux_thread_p->SetSuspended ();
+            break;
+        default:
+            return Error ("NativeProcessLinux::%s (): unexpected state %s specified for pid %" PRIu64 ", tid %" PRIu64,
+                    __FUNCTION__, StateAsCString (action->state), GetID (), thread_sp->GetID ());
+        }
+    }
+    return Error ();
 }
 
 Error
