@@ -34,13 +34,10 @@
 #include "lldb/Core/State.h"
 #include "lldb/Host/Host.h"
 #include "lldb/Symbol/ObjectFile.h"
-#include "lldb/Target/Thread.h"
-#include "lldb/Target/RegisterContext.h"
 #include "lldb/Utility/PseudoTerminal.h"
 
 #include "LinuxSignals.h"
 #include "NativeThreadLinux.h"
-#include "POSIXThread.h"
 #include "ProcessPOSIXLog.h"
 
 #define DEBUG_PTRACE_MAXBYTES 20
@@ -2024,20 +2021,35 @@ NativeProcessLinux::Resume (const ResumeActionList &resume_actions)
         case eStateRunning:
             // Run the thread, possibly feeding it the signal.
             linux_thread_p->SetRunning ();
-            Resume (thread_sp->GetID (), (action->signal > 0) ? action->signal : LLDB_INVALID_SIGNAL_NUMBER);
+            if (action->signal > 0)
+            {
+                // Resume the thread and deliver the given signal,
+                // then mark as delivered.
+                Resume (thread_sp->GetID (), action->signal);
+                resume_actions.SetSignalHandledForThread (thread_sp->GetID ());
+            }
+            else
+            {
+                // Just resume the thread with no signal.
+                Resume (thread_sp->GetID (), LLDB_INVALID_SIGNAL_NUMBER);
+            }
             break;
+
         case eStateStepping:
             // Keep the thread inactive.
             linux_thread_p->SetStepping ();
             break;
+
         case eStateStopped:
             // Keep the thread inactive.
             linux_thread_p->SetStopped ();
             break;
+
         case eStateSuspended:
             // Keep the thread inactive.
             linux_thread_p->SetSuspended ();
             break;
+
         default:
             return Error ("NativeProcessLinux::%s (): unexpected state %s specified for pid %" PRIu64 ", tid %" PRIu64,
                     __FUNCTION__, StateAsCString (action->state), GetID (), thread_sp->GetID ());
@@ -2067,6 +2079,22 @@ NativeProcessLinux::Detach ()
 {
     StopMonitor ();
     return Error ();
+}
+
+Error
+NativeProcessLinux::Signal (int signo)
+{
+    Error error;
+
+    Log *log (GetLogIfAllCategoriesSet (LIBLLDB_LOG_PROCESS));
+    if (log)
+        log->Printf ("NativeProcessLinux::%s: sending signal %d (%s) to pid %" PRIu64, 
+                __FUNCTION__, signo,  GetUnixSignals ().GetSignalAsCString (signo), GetID ());
+
+    if (kill(GetID(), signo))
+        error.SetErrorToErrno();
+
+    return error;
 }
 
 Error

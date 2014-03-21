@@ -318,6 +318,17 @@ namespace lldb_private {
         virtual Error
         Detach () = 0;
 
+        //------------------------------------------------------------------
+        /// Sends a process a UNIX signal \a signal.
+        ///
+        /// Implementer note: the WillSignal ()/DidSignal () calls
+        /// from the Process class are not replicated here since no
+        /// concrete classes implemented any behavior for those and
+        /// put all the work in DoSignal (...).
+        ///
+        /// @return
+        ///     Returns an error object.
+        //------------------------------------------------------------------
         virtual Error
         Signal (int signo) = 0;
 
