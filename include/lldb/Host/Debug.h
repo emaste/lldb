@@ -11,7 +11,6 @@
 #define liblldb_Debug_h_
 
 #include "lldb/lldb-private.h"
-#include "lldb/Core/Broadcaster.h"
 #include "lldb/Core/Error.h"
 #include "lldb/Core/StreamString.h"
 #include "lldb/Host/Mutex.h"
@@ -274,18 +273,9 @@ namespace lldb_private {
     // NativeProcessProtocol
     //------------------------------------------------------------------
     class NativeProcessProtocol :
-        public std::enable_shared_from_this<NativeProcessProtocol>,
-        public Broadcaster
+        public std::enable_shared_from_this<NativeProcessProtocol>
 {
     public:
-
-        enum class EventType
-        {
-            ProcessMessage = (1u << 0),
-            NewThread = (1u << 1),
-            ThreadStopped = (1u << 2)
-        };
-
         static NativeProcessProtocol *
         CreateInstance (lldb::pid_t pid);
 
@@ -293,14 +283,15 @@ namespace lldb_private {
         // then the process should be attached to. When attaching to a process
         // lldb_private::Host calls should be used to locate the process to attach to,
         // and then this function should be called.
-        NativeProcessProtocol (lldb::pid_t pid, lldb_private::BroadcasterManager *broadcaster_manager) :
-            Broadcaster(broadcaster_manager, "lldb.native-process-protocol"),
+        NativeProcessProtocol (lldb::pid_t pid) :
             m_pid (pid),
             m_threads(),
             m_threads_mutex (Mutex::eMutexTypeRecursive),
             m_state (lldb::eStateInvalid),
             m_exit_status(0),
-            m_exit_description()
+            m_exit_description(),
+            m_delegates_mutex (Mutex::eMutexTypeRecursive),
+            m_delegates ()
         {
         }
 
@@ -475,6 +466,57 @@ namespace lldb_private {
             return lldb::NativeThreadProtocolSP();
         }
 
+        // ---------------------------------------------------------------------
+        // Callbacks for low-level process state changes
+        // ---------------------------------------------------------------------
+        class NativeDelegate
+        {
+        public:
+            virtual
+            ~NativeDelegate () {}
+
+            virtual
+            void Initialize (NativeProcessProtocol *process) = 0;
+
+            virtual
+            void ProcessStateChanged (NativeProcessProtocol *process, lldb::StateType state) = 0;
+
+            virtual
+            void ThreadStateChanged (NativeThreadProtocol *thread, lldb::StateType state) = 0;
+        };
+
+        //------------------------------------------------------------------
+        /// Register a native delegate.
+        ///
+        /// Clients can register nofication callbacks by passing in a
+        /// NativeDelegate impl and passing it into this function.
+        ///
+        /// Note: it is assumed that the lifetime of the
+        /// native_delegate will outlive the NativeProcessProtocol.
+        ///
+        /// @param[in] native_delegate
+        ///     A NativeDelegate impl to be called when certain events
+        ///     happen within the NativeProcessProtocol or related threads.
+        ///
+        /// @see NativeProcessProtocol::NativeDelegate.
+        //------------------------------------------------------------------
+        void
+        RegisterNativeDelegate (NativeDelegate *native_delegate);
+
+        //------------------------------------------------------------------
+        /// Unregister a native delegate previously registered.
+        ///
+        /// @param[in] native_delegate
+        ///     A NativeDelegate impl previously registered with this process.
+        ///
+        /// @return Returns \b true if the NativeDelegate was
+        /// successfully removed from the process, \b false otherwise.
+        ///
+        /// @see NativeProcessProtocol::NativeDelegate
+        //------------------------------------------------------------------
+        bool
+        UnregisterNativeDelegate (NativeDelegate *native_delegate);
+
     protected:
         lldb::pid_t m_pid;
         std::vector<lldb::NativeThreadProtocolSP> m_threads;
@@ -482,6 +524,14 @@ namespace lldb_private {
         lldb::StateType m_state;
         int m_exit_status;
         std::string m_exit_description;
+        Mutex m_delegates_mutex;
+        std::vector<NativeDelegate*> m_delegates;
+
+        void
+        SynchronouslyNotifyProcessStateChanged (lldb::StateType state);
+
+        void
+        SynchronouslyNotifyThreadStateChanged (NativeThreadProtocol *thread, lldb::StateType state);
     };
 
 }

@@ -526,6 +526,7 @@ RecurseCopy_Callback (void *baton,
         case FileSpec::eFileTypeInvalid:
         case FileSpec::eFileTypeOther:
         case FileSpec::eFileTypeUnknown:
+        default:
             rc_baton->error.SetErrorStringWithFormat("invalid file detected during copy: %s", src.GetPath().c_str());
             return FileSpec::eEnumerateDirectoryResultQuit; // got an error, bail out
             break;
@@ -1188,7 +1189,6 @@ Platform::CalculateMD5 (const FileSpec& file_spec,
 Error
 Platform::LaunchDebugProcess (
     ProcessLaunchInfo &launch_info,
-    BroadcasterManager *broadcaster_manager,
     lldb::NativeProcessProtocolSP &process_sp)
 {
     // right now we're having each platform individually implement

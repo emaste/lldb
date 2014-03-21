@@ -1107,7 +1107,6 @@ NativeProcessLinux::AttachArgs::~AttachArgs()
 
 lldb_private::Error
 NativeProcessLinux::LaunchProcess (
-    BroadcasterManager *broadcaster_manager,
     lldb_private::Module *exe_module,
     lldb_private::ProcessLaunchInfo &launch_info,
     lldb::NativeProcessProtocolSP &native_process_sp)
@@ -1148,7 +1147,6 @@ NativeProcessLinux::LaunchProcess (
     // Create the NativeProcessLinux in launch mode.
     native_process_sp.reset (
         new NativeProcessLinux (
-            broadcaster_manager,
             exe_module,
             launch_info.GetArguments ().GetConstArgumentVector (),
             launch_info.GetEnvironmentEntries ().GetConstArgumentVector (),
@@ -1174,7 +1172,6 @@ NativeProcessLinux::LaunchProcess (
 
 lldb_private::Error
 NativeProcessLinux::DoAttachToProcessWithID (
-    BroadcasterManager *broadcaster_manager,
     lldb::pid_t pid,
     lldb::NativeProcessProtocolSP &native_process_sp)
 {
@@ -1194,7 +1191,7 @@ NativeProcessLinux::DoAttachToProcessWithID (
     if (!error.Success ())
         return error;
 
-    native_process_sp.reset(new NativeProcessLinux (broadcaster_manager, pid, error));
+    native_process_sp.reset(new NativeProcessLinux (pid, error));
     if (!error.Success ())
         return error;
 
@@ -1257,7 +1254,6 @@ NativeProcessLinux::GetFilePath (
 /// operations such as register reads/writes, stepping, etc.  See the comments
 /// on the Operation class for more info as to why this is needed.
 NativeProcessLinux::NativeProcessLinux (
-    BroadcasterManager *broadcaster_manager,
     Module *module,
     const char *argv[],
     const char *envp[],
@@ -1266,7 +1262,7 @@ NativeProcessLinux::NativeProcessLinux (
     const char *stderr_path,
     const char *working_dir,
     lldb_private::Error &error) :
-    NativeProcessProtocol (LLDB_INVALID_PROCESS_ID, broadcaster_manager),
+    NativeProcessProtocol (LLDB_INVALID_PROCESS_ID),
     m_listener (&(GetSharedLoggingListener ())),
     m_arch (module ? module->GetArchitecture () : ArchSpec ()),
     m_operation_thread (LLDB_INVALID_HOST_THREAD),
@@ -1320,10 +1316,9 @@ WAIT_AGAIN:
 }
 
 NativeProcessLinux::NativeProcessLinux (
-    BroadcasterManager *broadcaster_manager,
     lldb::pid_t pid,
     lldb_private::Error &error) :
-    NativeProcessProtocol (pid, broadcaster_manager),
+    NativeProcessProtocol (pid),
     m_listener(&(GetSharedLoggingListener ())),
     m_arch (),
     m_operation_thread (LLDB_INVALID_HOST_THREAD),

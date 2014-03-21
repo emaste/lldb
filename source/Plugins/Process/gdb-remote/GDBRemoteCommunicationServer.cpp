@@ -320,7 +320,6 @@ GDBRemoteCommunicationServer::LaunchDebugServerProcess ()
         assert (!m_debugged_process_sp && "lldb-gdbserver creating debugged process but one already exists");
         error = m_platform_sp->LaunchDebugProcess (
             m_process_launch_info,
-            m_debugger_sp.get (),
             m_debugged_process_sp);
     }
 

@@ -207,3 +207,48 @@ NativeProcessProtocol::RemoveWatchpoint (lldb::addr_t addr)
     }
     return overall_error;
 }
+
+void
+NativeProcessProtocol::RegisterNativeDelegate (NativeDelegate *native_delegate)
+{
+    assert (native_delegate);
+    if (!native_delegate)
+        return;
+
+    Mutex::Locker locker (m_delegates_mutex);
+    m_delegates.push_back (native_delegate);
+    native_delegate->Initialize (this);
+}
+
+bool
+NativeProcessProtocol::UnregisterNativeDelegate (NativeDelegate *native_delegate)
+{
+    assert (native_delegate);
+    if (!native_delegate)
+        return false;
+
+    Mutex::Locker locker (m_delegates_mutex);
+
+    const auto initial_size = m_delegates.size ();
+    m_delegates.erase (remove (m_delegates.begin (), m_delegates.end (), native_delegate), m_delegates.end ());
+
+    // We removed the delegate if the count of delegates shrank after
+    // removing all copies of the given native_delegate from the vector.
+    return m_delegates.size () < initial_size;
+}
+
+void
+NativeProcessProtocol::SynchronouslyNotifyProcessStateChanged (lldb::StateType state)
+{
+    Mutex::Locker locker (m_delegates_mutex);
+    for (auto native_delegate: m_delegates)
+        native_delegate->ProcessStateChanged (this, state);
+}
+
+void
+NativeProcessProtocol::SynchronouslyNotifyThreadStateChanged (NativeThreadProtocol *thread, lldb::StateType state)
+{
+    Mutex::Locker locker (m_delegates_mutex);
+    for (auto native_delegate: m_delegates)
+        native_delegate->ThreadStateChanged (thread, state);
+}

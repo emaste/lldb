@@ -880,7 +880,6 @@ namespace lldb_private {
         virtual Error
         LaunchDebugProcess (
             ProcessLaunchInfo &launch_info,
-            BroadcasterManager *broadcaster_manager,
             lldb::NativeProcessProtocolSP &process_sp);
 
     protected:

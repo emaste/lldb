@@ -493,7 +493,6 @@ PlatformLinux::CalculateTrapHandlerSymbolNames ()
 Error
 PlatformLinux::LaunchDebugProcess (
     ProcessLaunchInfo &launch_info,
-    BroadcasterManager *broadcaster_manager,
     lldb::NativeProcessProtocolSP &process_sp)
 {
     if (!IsHost ())
@@ -516,7 +515,6 @@ PlatformLinux::LaunchDebugProcess (
 
     // Launch it for debugging
     error = NativeProcessLinux::LaunchProcess (
-        broadcaster_manager,
         exe_module_sp.get (),
         launch_info,
         process_sp);

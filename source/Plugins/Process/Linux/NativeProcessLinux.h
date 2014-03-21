@@ -84,14 +84,12 @@ namespace lldb_private
         // ---------------------------------------------------------------------
         static lldb_private::Error
         LaunchProcess (
-            BroadcasterManager *broadcaster_manager,
             lldb_private::Module *exe_module,
             lldb_private::ProcessLaunchInfo &launch_info,
             lldb::NativeProcessProtocolSP &native_process_sp);
 
         static lldb_private::Error
         DoAttachToProcessWithID (
-            BroadcasterManager *broadcaster_manager,
             lldb::pid_t pid,
             lldb::NativeProcessProtocolSP &native_process_sp);
 
@@ -102,7 +100,6 @@ namespace lldb_private
         /// Launches an inferior process ready for debugging.  Forms the
         /// implementation of Process::DoLaunch.
         NativeProcessLinux(
-            BroadcasterManager *broadcaster_manager,
             lldb_private::Module *module,
             char const *argv[],
             char const *envp[],
@@ -113,7 +110,6 @@ namespace lldb_private
             lldb_private::Error &error);
 
         NativeProcessLinux(
-            BroadcasterManager *broadcaster_manager,
             lldb::pid_t pid,
             lldb_private::Error &error);
 
