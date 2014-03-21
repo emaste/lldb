@@ -63,6 +63,15 @@ NativeThreadProtocol::WriteRegister (uint32_t reg, const RegisterValue &reg_valu
 // -----------------------------------------------------------------------------
 
 bool
+NativeProcessProtocol::IsAlive () const
+{
+    return m_state != eStateDetached
+        && m_state != eStateExited
+        && m_state != eStateInvalid
+        && m_state != eStateUnloaded;
+}
+
+bool
 NativeProcessProtocol::GetByteOrder (lldb::ByteOrder &byte_order)
 {
     ArchSpec process_arch;
@@ -245,10 +254,3 @@ NativeProcessProtocol::SynchronouslyNotifyProcessStateChanged (lldb::StateType s
         native_delegate->ProcessStateChanged (this, state);
 }
 
-void
-NativeProcessProtocol::SynchronouslyNotifyThreadStateChanged (NativeThreadProtocol *thread, lldb::StateType state)
-{
-    Mutex::Locker locker (m_delegates_mutex);
-    for (auto native_delegate: m_delegates)
-        native_delegate->ThreadStateChanged (thread, state);
-}

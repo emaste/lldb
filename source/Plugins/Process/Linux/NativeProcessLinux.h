@@ -262,9 +262,6 @@ namespace lldb_private
         lldb::addr_t
         GetSharedLibraryInfoAddress () override;
 
-        bool
-        IsAlive () override;
-
         size_t
         UpdateThreads () override;
 

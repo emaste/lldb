@@ -342,7 +342,7 @@ namespace lldb_private {
         GetSharedLibraryInfoAddress () = 0;
 
         virtual bool
-        IsAlive () = 0;
+        IsAlive () const;
 
         virtual size_t
         UpdateThreads () = 0;
@@ -405,9 +405,11 @@ namespace lldb_private {
         }
 
         void
-        SetState (lldb::StateType state)
+        SetState (lldb::StateType state, bool notify_delegates = true)
         {
             m_state = state;
+            if (notify_delegates)
+                SynchronouslyNotifyProcessStateChanged (state);
         }
 
         bool
@@ -480,9 +482,6 @@ namespace lldb_private {
 
             virtual
             void ProcessStateChanged (NativeProcessProtocol *process, lldb::StateType state) = 0;
-
-            virtual
-            void ThreadStateChanged (NativeThreadProtocol *thread, lldb::StateType state) = 0;
         };
 
         //------------------------------------------------------------------
@@ -529,9 +528,6 @@ namespace lldb_private {
 
         void
         SynchronouslyNotifyProcessStateChanged (lldb::StateType state);
-
-        void
-        SynchronouslyNotifyThreadStateChanged (NativeThreadProtocol *thread, lldb::StateType state);
     };
 
 }

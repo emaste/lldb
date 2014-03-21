@@ -1125,9 +1125,6 @@ NativeProcessLinux::LaunchProcess (
       }
     }
 
-    // FIXME set this in the constructor.
-    // SetPrivateState(eStateLaunching);
-
     const lldb_private::ProcessLaunchInfo::FileAction *file_action;
 
     // Default of NULL will mean to use existing open file descriptors.
@@ -1270,6 +1267,8 @@ NativeProcessLinux::NativeProcessLinux (
     m_terminal_fd (-1),
     m_operation (0)
 {
+    SetState(eStateLaunching);
+
     std::unique_ptr<LaunchArgs> args(
         new LaunchArgs(
             this, module, argv, envp,
@@ -1326,6 +1325,8 @@ NativeProcessLinux::NativeProcessLinux (
     m_terminal_fd (-1),
     m_operation (0)
 {
+    SetState(eStateAttaching);
+
     sem_init (&m_operation_pending, 0, 0);
     sem_init (&m_operation_done, 0, 0);
 
