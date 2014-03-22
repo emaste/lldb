@@ -55,23 +55,17 @@ public:
     virtual const RegisterSet *
     GetRegisterSet (size_t reg_set) = 0;
 
-    virtual bool
+    virtual Error
     ReadRegister (const RegisterInfo *reg_info, RegisterValue &reg_value) = 0;
 
-    virtual bool
+    virtual Error
     WriteRegister (const RegisterInfo *reg_info, const RegisterValue &reg_value) = 0;
 
-    virtual bool
-    ReadAllRegisterValues (lldb::DataBufferSP &data_sp)
-    {
-        return false;
-    }
+    virtual Error
+    ReadAllRegisterValues (lldb::DataBufferSP &data_sp) = 0;
 
-    virtual bool
-    WriteAllRegisterValues (const lldb::DataBufferSP &data_sp)
-    {
-        return false;
-    }
+    virtual Error
+    WriteAllRegisterValues (const lldb::DataBufferSP &data_sp) = 0;
 
     // // These two functions are used to implement "push" and "pop" of register states.  They are used primarily
     // // for expression evaluation, where we need to push a new state (storing the old one in data_sp) and then
@@ -140,21 +134,22 @@ public:
     uint64_t
     GetPC (uint64_t fail_value = LLDB_INVALID_ADDRESS);
 
-    bool
+    Error
     SetPC (uint64_t pc);
 
-    bool SetPC (Address addr);
+    // Error
+    // SetPC (Address addr);
 
     uint64_t
     GetSP (uint64_t fail_value = LLDB_INVALID_ADDRESS);
 
-    bool
+    Error
     SetSP (uint64_t sp);
 
     uint64_t
     GetFP (uint64_t fail_value = LLDB_INVALID_ADDRESS);
 
-    bool
+    Error
     SetFP (uint64_t fp);
 
     const char *
@@ -172,10 +167,10 @@ public:
     uint64_t
     ReadRegisterAsUnsigned (const RegisterInfo *reg_info, uint64_t fail_value);
 
-    bool
+    Error
     WriteRegisterFromUnsigned (uint32_t reg, uint64_t uval);
 
-    bool
+    Error
     WriteRegisterFromUnsigned (const RegisterInfo *reg_info, uint64_t uval);
 
     // bool

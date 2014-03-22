@@ -234,10 +234,10 @@ namespace lldb_private {
         WriteRegister (uint32_t reg, const RegisterValue &reg_value);
 
         virtual Error
-        SaveAllRegisters (lldb::DataBufferSP &data_sp) = 0;
+        SaveAllRegisters (lldb::DataBufferSP &data_sp);
 
         virtual Error
-        RestoreAllRegisters (lldb::DataBufferSP &data_sp) = 0;
+        RestoreAllRegisters (lldb::DataBufferSP &data_sp);
 
         virtual bool
         GetStopReason (ThreadStopInfo &stop_info) = 0;

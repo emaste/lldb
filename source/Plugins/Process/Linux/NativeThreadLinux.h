@@ -32,12 +32,6 @@ namespace lldb_private
         lldb::StateType
         GetState () override;
 
-        Error
-        SaveAllRegisters (lldb::DataBufferSP &data_sp) override;
-
-        Error
-        RestoreAllRegisters (lldb::DataBufferSP &data_sp) override;
-
         bool
         GetStopReason (ThreadStopInfo &stop_info) override;
 

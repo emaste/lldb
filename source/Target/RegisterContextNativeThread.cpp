@@ -107,11 +107,11 @@ RegisterContextNativeThread::GetPC (uint64_t fail_value)
     return ReadRegisterAsUnsigned (reg, fail_value);
 }
 
-bool
+Error
 RegisterContextNativeThread::SetPC (uint64_t pc)
 {
     uint32_t reg = ConvertRegisterKindToRegisterNumber (eRegisterKindGeneric, LLDB_REGNUM_GENERIC_PC);
-    bool success = WriteRegisterFromUnsigned (reg, pc);
+    return WriteRegisterFromUnsigned (reg, pc);
     // FIXME figure out if we need this on the llgs side - the lldb
     // side might take care of it for us.
     // if (success)
@@ -122,7 +122,6 @@ RegisterContextNativeThread::SetPC (uint64_t pc)
     //     else
     //         m_thread.ClearStackFrames ();
     // }
-    return success;
 }
 
 // bool
@@ -145,7 +144,7 @@ RegisterContextNativeThread::GetSP (uint64_t fail_value)
     return ReadRegisterAsUnsigned (reg, fail_value);
 }
 
-bool
+Error
 RegisterContextNativeThread::SetSP (uint64_t sp)
 {
     uint32_t reg = ConvertRegisterKindToRegisterNumber (eRegisterKindGeneric, LLDB_REGNUM_GENERIC_SP);
@@ -159,7 +158,7 @@ RegisterContextNativeThread::GetFP (uint64_t fail_value)
     return ReadRegisterAsUnsigned (reg, fail_value);
 }
 
-bool
+Error
 RegisterContextNativeThread::SetFP (uint64_t fp)
 {
     uint32_t reg = ConvertRegisterKindToRegisterNumber (eRegisterKindGeneric, LLDB_REGNUM_GENERIC_FP);
@@ -195,30 +194,32 @@ RegisterContextNativeThread::ReadRegisterAsUnsigned (const RegisterInfo *reg_inf
     if (reg_info)
     {
         RegisterValue value;
-        if (ReadRegister (reg_info, value))
+        if (ReadRegister (reg_info, value).Success ())
             return value.GetAsUInt64();
     }
     return fail_value;
 }
 
-bool
+Error
 RegisterContextNativeThread::WriteRegisterFromUnsigned (uint32_t reg, uint64_t uval)
 {
     if (reg == LLDB_INVALID_REGNUM)
-        return false;
+        return Error ("RegisterContextNativeThread::%s (): reg is invalid", __FUNCTION__);
     return WriteRegisterFromUnsigned (GetRegisterInfoAtIndex (reg), uval);
 }
 
-bool
+Error
 RegisterContextNativeThread::WriteRegisterFromUnsigned (const RegisterInfo *reg_info, uint64_t uval)
 {
-    if (reg_info)
-    {
-        RegisterValue value;
-        if (value.SetUInt(uval, reg_info->byte_size))
-            return WriteRegister (reg_info, value);
-    }
-    return false;
+    assert (reg_info);
+    if (!reg_info)
+        return Error ("reg_info is NULL");
+
+    RegisterValue value;
+    if (!value.SetUInt(uval, reg_info->byte_size))
+        return Error ("RegisterValue::SetUInt () failed");
+
+    return WriteRegister (reg_info, value);
 }
 
 // bool
