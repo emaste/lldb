@@ -2180,6 +2180,36 @@ NativeProcessLinux::GetArchitecture (ArchSpec &arch)
     return true;
 }
 
+Error
+NativeProcessLinux::SetBreakpoint (lldb::addr_t addr, size_t size, bool hardware)
+{
+    if (hardware)
+        return Error ("NativeProcessLinux does not support hardware breakpoints");
+    else
+        return SetSoftwareBreakpoint (addr, size);
+}
+
+Error
+NativeProcessLinux::GetSoftwareBreakpointTrapOpcode (size_t trap_opcode_size_hint, size_t &actual_opcode_size, const uint8_t *&trap_opcode_bytes)
+{
+    // FIXME put this behind a breakpoint protocol class that can be
+    // set per architecture.  Need ARM, MIPS support here.
+    static const uint8_t g_i386_opcode [] = { 0xCC };
+
+    switch (m_arch.GetMachine ())
+    {
+    case llvm::Triple::x86:
+    case llvm::Triple::x86_64:
+        trap_opcode_bytes = g_i386_opcode;
+        actual_opcode_size = sizeof(g_i386_opcode);
+        return Error ();
+
+    default:
+        assert(false && "CPU type not supported!");
+        return Error ("CPU type not supported");
+    }
+}
+
 bool
 NativeProcessLinux::StopThread(lldb::tid_t tid)
 {

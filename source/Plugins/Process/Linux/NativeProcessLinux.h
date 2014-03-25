@@ -271,8 +271,12 @@ namespace lldb_private
         Error
         SetBreakpoint (lldb::addr_t addr, size_t size, bool hardware) override;
 
+    protected:
+        // ---------------------------------------------------------------------
+        // NativeProcessProtocol protected interface
+        // ---------------------------------------------------------------------
         Error
-        RemoveBreakpoint (lldb::addr_t addr, size_t size) override;
+        GetSoftwareBreakpointTrapOpcode (size_t trap_opcode_size_hint, size_t &actual_opcode_size, const uint8_t *&trap_opcode_bytes) override;
 
     private:
         Listener *m_listener;

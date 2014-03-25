@@ -10,6 +10,8 @@
 #ifndef liblldb_Debug_h_
 #define liblldb_Debug_h_
 
+#include <map>
+
 #include "lldb/lldb-private.h"
 #include "lldb/Core/Error.h"
 #include "lldb/Core/StreamString.h"
@@ -206,6 +208,16 @@ namespace lldb_private {
         } details;
     };
 
+    class BreakpointRemover
+    {
+    public:
+        virtual
+        ~BreakpointRemover () {}
+
+        virtual Error
+        RemoveBreakpoint () = 0;
+    };
+
     //------------------------------------------------------------------
     // NativeThreadProtocol
     //------------------------------------------------------------------
@@ -274,7 +286,7 @@ namespace lldb_private {
     //------------------------------------------------------------------
     class NativeProcessProtocol :
         public std::enable_shared_from_this<NativeProcessProtocol>
-{
+    {
     public:
         static NativeProcessProtocol *
         CreateInstance (lldb::pid_t pid);
@@ -283,17 +295,7 @@ namespace lldb_private {
         // then the process should be attached to. When attaching to a process
         // lldb_private::Host calls should be used to locate the process to attach to,
         // and then this function should be called.
-        NativeProcessProtocol (lldb::pid_t pid) :
-            m_pid (pid),
-            m_threads(),
-            m_threads_mutex (Mutex::eMutexTypeRecursive),
-            m_state (lldb::eStateInvalid),
-            m_exit_status(0),
-            m_exit_description(),
-            m_delegates_mutex (Mutex::eMutexTypeRecursive),
-            m_delegates ()
-        {
-        }
+        NativeProcessProtocol (lldb::pid_t pid);
 
     public:
         virtual ~NativeProcessProtocol ()
@@ -357,7 +359,7 @@ namespace lldb_private {
         SetBreakpoint (lldb::addr_t addr, size_t size, bool hardware) = 0;
 
         virtual Error
-        RemoveBreakpoint (lldb::addr_t addr, size_t size) = 0;
+        RemoveBreakpoint (lldb::addr_t addr);
 
         //----------------------------------------------------------------------
         // Watchpoint functions
@@ -517,6 +519,9 @@ namespace lldb_private {
         UnregisterNativeDelegate (NativeDelegate *native_delegate);
 
     protected:
+        typedef std::unique_ptr<BreakpointRemover> BreakpointRemoverUP;
+        typedef std::map<lldb::addr_t, BreakpointRemoverUP> BreakpointRemoverMapType;
+
         lldb::pid_t m_pid;
         std::vector<lldb::NativeThreadProtocolSP> m_threads;
         mutable Mutex m_threads_mutex;
@@ -525,9 +530,17 @@ namespace lldb_private {
         std::string m_exit_description;
         Mutex m_delegates_mutex;
         std::vector<NativeDelegate*> m_delegates;
+        Mutex m_breakpoint_remover_mutex;
+        BreakpointRemoverMapType m_breakpoint_removers;
 
         void
         SynchronouslyNotifyProcessStateChanged (lldb::StateType state);
+
+        Error
+        SetSoftwareBreakpoint (lldb::addr_t addr, size_t size);
+
+        virtual Error
+        GetSoftwareBreakpointTrapOpcode (size_t trap_opcode_size_hint, size_t &actual_opcode_size, const uint8_t *&trap_opcode_bytes) = 0;
     };
 
 }
