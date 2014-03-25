@@ -492,17 +492,21 @@ namespace lldb_private {
         /// Clients can register nofication callbacks by passing in a
         /// NativeDelegate impl and passing it into this function.
         ///
-        /// Note: it is assumed that the lifetime of the
-        /// native_delegate will outlive the NativeProcessProtocol.
+        /// Note: it is required that the lifetime of the
+        /// native_delegate outlive the NativeProcessProtocol.
         ///
         /// @param[in] native_delegate
         ///     A NativeDelegate impl to be called when certain events
         ///     happen within the NativeProcessProtocol or related threads.
         ///
+        /// @return
+        ///     true if the delegate was registered successfully;
+        ///     false if the delegate was already registered.
+        ///
         /// @see NativeProcessProtocol::NativeDelegate.
         //------------------------------------------------------------------
-        void
-        RegisterNativeDelegate (NativeDelegate *native_delegate);
+        bool
+        RegisterNativeDelegate (NativeDelegate &native_delegate);
 
         //------------------------------------------------------------------
         /// Unregister a native delegate previously registered.
@@ -516,7 +520,7 @@ namespace lldb_private {
         /// @see NativeProcessProtocol::NativeDelegate
         //------------------------------------------------------------------
         bool
-        UnregisterNativeDelegate (NativeDelegate *native_delegate);
+        UnregisterNativeDelegate (NativeDelegate &native_delegate);
 
     protected:
         typedef std::unique_ptr<BreakpointRemover> BreakpointRemoverUP;
