@@ -334,7 +334,7 @@ IRForTarget::ResolveFunctionPointers(llvm::Module &llvm_module)
         if (!is_decl)
             continue;
         
-        if (fun->use_empty())
+        if (fun->hasNUses(0))
             continue; // ignore
         
         uint64_t addr = LLDB_INVALID_ADDRESS;
@@ -653,7 +653,7 @@ IRForTarget::CreateResultVariable (llvm::Function &llvm_function)
                     PrintValue(result_global).c_str(),
                     PrintValue(new_result_global).c_str());
     
-    if (result_global->use_empty())
+    if (result_global->hasNUses(0))
     {
         // We need to synthesize a store for this variable, because otherwise
         // there's nothing to put into its equivalent persistent variable.
@@ -701,6 +701,8 @@ IRForTarget::CreateResultVariable (llvm::Function &llvm_function)
     return true;
 }
 
+#if 0
+#endif
 bool
 IRForTarget::RewriteObjCConstString (llvm::GlobalVariable *ns_str,
                                      llvm::GlobalVariable *cstr)
@@ -1744,18 +1746,28 @@ IRForTarget::ResolveExternals (Function &llvm_function)
 {
     lldb_private::Log *log(lldb_private::GetLogIfAllCategoriesSet (LIBLLDB_LOG_EXPRESSIONS));
     
-    for (GlobalVariable &global_var : m_module->globals())
+    for (Module::global_iterator global = m_module->global_begin(), end = m_module->global_end();
+         global != end;
+         ++global)
     {
-        std::string global_name = global_var.getName().str();
+        if (!global)
+        {
+            if (m_error_stream)
+                m_error_stream->Printf("Internal error [IRForTarget]: global variable is NULL");
+            
+            return false;
+        }
+        
+        std::string global_name = (*global).getName().str();
         
         if (log)
             log->Printf("Examining %s, DeclForGlobalValue returns %p", 
                         global_name.c_str(),
-                        DeclForGlobal(&global_var));
+                        DeclForGlobal(global));
         
         if (global_name.find("OBJC_IVAR") == 0)
         {
-            if (!HandleSymbol(&global_var))
+            if (!HandleSymbol(global))
             {
                 if (m_error_stream)
                     m_error_stream->Printf("Error [IRForTarget]: Couldn't find Objective-C indirect ivar symbol %s\n", global_name.c_str());
@@ -1765,7 +1777,7 @@ IRForTarget::ResolveExternals (Function &llvm_function)
         }
         else if (global_name.find("OBJC_CLASSLIST_REFERENCES_$") != global_name.npos)
         {
-            if (!HandleObjCClass(&global_var))
+            if (!HandleObjCClass(global))
             {
                 if (m_error_stream)
                     m_error_stream->Printf("Error [IRForTarget]: Couldn't resolve the class for an Objective-C static method call\n");
@@ -1775,7 +1787,7 @@ IRForTarget::ResolveExternals (Function &llvm_function)
         }
         else if (global_name.find("OBJC_CLASSLIST_SUP_REFS_$") != global_name.npos)
         {
-            if (!HandleObjCClass(&global_var))
+            if (!HandleObjCClass(global))
             {
                 if (m_error_stream)
                     m_error_stream->Printf("Error [IRForTarget]: Couldn't resolve the class for an Objective-C static method call\n");
@@ -1783,9 +1795,9 @@ IRForTarget::ResolveExternals (Function &llvm_function)
                 return false;
             }
         }
-        else if (DeclForGlobal(&global_var))
+        else if (DeclForGlobal(global))
         {
-            if (!MaybeHandleVariable (&global_var))
+            if (!MaybeHandleVariable (global))
             {
                 if (m_error_stream)
                     m_error_stream->Printf("Internal error [IRForTarget]: Couldn't rewrite external variable %s\n", global_name.c_str());
@@ -1807,12 +1819,16 @@ IRForTarget::ReplaceStrings ()
     
     OffsetsTy offsets;
     
-    for (GlobalVariable &gv : m_module->globals())
+    for (Module::global_iterator gi = m_module->global_begin(), ge = m_module->global_end();
+         gi != ge;
+         ++gi)
     {
-        if (!gv.hasInitializer())
+        GlobalVariable *gv = gi;
+        
+        if (!gv->hasInitializer())
             continue;
         
-        Constant *gc = gv.getInitializer();
+        Constant *gc = gv->getInitializer();
         
         std::string str;
         
@@ -1850,7 +1866,7 @@ IRForTarget::ReplaceStrings ()
             str = gc_array->getAsString();
         }
             
-        offsets[&gv] = m_data_allocator.GetStream().GetSize();
+        offsets[gv] = m_data_allocator.GetStream().GetSize();
         
         m_data_allocator.GetStream().Write(str.c_str(), str.length() + 1);
     }
@@ -1932,8 +1948,12 @@ IRForTarget::ReplaceStaticLiterals (llvm::BasicBlock &basic_block)
     {
         llvm::Instruction &inst = *ii;
         
-        for (Value *operand_val : inst.operand_values())
+        for (Instruction::op_iterator oi = inst.op_begin(), oe = inst.op_end();
+             oi != oe;
+             ++oi)
         {
+            Value *operand_val = oi->get();
+            
             ConstantFP *operand_constant_fp = dyn_cast<ConstantFP>(operand_val);
             
             if (operand_constant_fp/* && operand_constant_fp->getType()->isX86_FP80Ty()*/)
@@ -2499,29 +2519,37 @@ IRForTarget::StripAllGVs (Module &llvm_module)
     {
         erased = false;
         
-        for (GlobalVariable &global_var : llvm_module.globals())
+        for (Module::global_iterator gi = llvm_module.global_begin(), ge = llvm_module.global_end();
+             gi != ge;
+             ++gi)
         {
-            global_var.removeDeadConstantUsers();
+            GlobalVariable *global_var = dyn_cast<GlobalVariable>(gi);
+        
+            global_var->removeDeadConstantUsers();
             
-            if (global_var.use_empty())
+            if (global_var->use_empty())
             {
                 if (log)
                     log->Printf("Did remove %s",
-                                PrintValue(&global_var).c_str());
-                global_var.eraseFromParent();
+                                PrintValue(global_var).c_str());
+                global_var->eraseFromParent();
                 erased = true;
                 break;
             }
         }
     }
     
-    for (GlobalVariable &global_var : llvm_module.globals())
+    for (Module::global_iterator gi = llvm_module.global_begin(), ge = llvm_module.global_end();
+         gi != ge;
+         ++gi)
     {
-        GlobalValue::user_iterator ui = global_var.user_begin();
+        GlobalVariable *global_var = dyn_cast<GlobalVariable>(gi);
+
+        GlobalValue::use_iterator ui = global_var->use_begin();
         
         if (log)
             log->Printf("Couldn't remove %s because of %s",
-                        PrintValue(&global_var).c_str(),
+                        PrintValue(global_var).c_str(),
                         PrintValue(*ui).c_str());
     }
     
