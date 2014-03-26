@@ -94,7 +94,7 @@ public:
     HasExternalSource ();
 
     void
-    SetExternalSource (llvm::IntrusiveRefCntPtr<clang::ExternalASTSource> &ast_source_ap);
+    SetExternalSource (llvm::OwningPtr<clang::ExternalASTSource> &ast_source_ap);
 
     void
     RemoveExternalSource ();
