@@ -336,7 +336,8 @@ IRExecutionUnit::GetRunnableInfo(Error &error,
     }
     
     // Make sure we see all sections, including ones that don't have relocations...
-    m_execution_engine_ap->setProcessAllSections(true);
+    // LLVM 3.4 does not have setProcessAllSections -- added in r204398
+    // m_execution_engine_ap->setProcessAllSections(true);
     
     m_execution_engine_ap->DisableLazyCompilation();
     
