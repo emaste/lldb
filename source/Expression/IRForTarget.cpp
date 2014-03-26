@@ -298,8 +298,12 @@ IRForTarget::RegisterFunctionMetadata(LLVMContext &context,
                                       llvm::Value *function_ptr, 
                                       const char *name)
 {
-    for (llvm::User *user : function_ptr->users())
+    for (Value::use_iterator i = function_ptr->use_begin(), e = function_ptr->use_end();
+         i != e;
+         ++i)
     {
+        Value *user = *i;
+                
         if (Instruction *user_inst = dyn_cast<Instruction>(user))
         {
             MDString* md_name = MDString::get(context, StringRef(name));
@@ -370,8 +374,8 @@ IRForTarget::ResolveFunctionPointers(llvm::Module &llvm_module)
                 if (fun->hasFnAttribute(llvm::Attribute::NoBuiltin)) {
                     llvm::Attribute builtin = llvm::Attribute::get(fun->getContext(), llvm::Attribute::Builtin);
 
-                    for (auto u : fun->users()) {
-                        if (auto call = dyn_cast<CallInst>(u)) {
+            for (auto u = fun->use_begin(), e = fun->use_end(); u != e; ++u) {
+                if (auto call = dyn_cast<CallInst>(*u)) {
                             call->removeAttribute(AttributeSet::FunctionIndex, builtin);
                         }
                     }
@@ -1643,14 +1647,16 @@ IRForTarget::HandleObjCClass(Value *classlist_reference)
     if (class_ptr == LLDB_INVALID_ADDRESS)
         return false;
     
-    if (global_variable->use_empty())
+    if (global_variable->use_begin() == global_variable->use_end())
         return false;
     
     SmallVector<LoadInst *, 2> load_instructions;
         
-    for (llvm::User *u : global_variable->users())
+    for (Value::use_iterator i = global_variable->use_begin(), e = global_variable->use_end();
+         i != e;
+         ++i)
     {
-        if (LoadInst *load_instruction = dyn_cast<LoadInst>(u))
+        if (LoadInst *load_instruction = dyn_cast<LoadInst>(*i))
             load_instructions.push_back(load_instruction);
     }
     
@@ -1885,13 +1891,15 @@ IRForTarget::ReplaceStrings ()
         if (log)
             log->Printf("Replacing GV %s with %s", PrintValue(gv).c_str(), PrintValue(new_initializer).c_str());
         
-        for (llvm::User *u : gv->users())
+        for (GlobalVariable::use_iterator ui = gv->use_begin(), ue = gv->use_end();
+             ui != ue;
+             ++ui)
         {
             if (log)
-                log->Printf("Found use %s", PrintValue(u).c_str());
+                log->Printf("Found use %s", PrintValue(*ui).c_str());
             
-            ConstantExpr *const_expr = dyn_cast<ConstantExpr>(u);
-            StoreInst *store_inst = dyn_cast<StoreInst>(u);
+            ConstantExpr *const_expr = dyn_cast<ConstantExpr>(*ui);
+            StoreInst *store_inst = dyn_cast<StoreInst>(*ui);
             
             if (const_expr)
             {
