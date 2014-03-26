@@ -2081,15 +2081,19 @@ IRForTarget::TurnGuardLoadIntoZero(llvm::Instruction* guard_load)
 {
     Constant* zero(ConstantInt::get(Type::getInt8Ty(m_module->getContext()), 0, true));
 
-    for (llvm::User *u : guard_load->users())
+    Value::use_iterator ui;
+    
+    for (ui = guard_load->use_begin();
+         ui != guard_load->use_end();
+         ++ui)
     {
-        if (isa<Constant>(u))
+        if (isa<Constant>(*ui))
         {
             // do nothing for the moment
         }
         else
         {
-            u->replaceUsesOfWith(guard_load, zero);
+            ui->replaceUsesOfWith(guard_load, zero);
         }
     }
     
@@ -2154,12 +2158,16 @@ IRForTarget::UnfoldConstant(Constant *old_constant,
 {
     lldb_private::Log *log(lldb_private::GetLogIfAllCategoriesSet (LIBLLDB_LOG_EXPRESSIONS));
 
+    Value::use_iterator ui;
+    
     SmallVector<User*, 16> users;
     
     // We do this because the use list might change, invalidating our iterator.
     // Much better to keep a work list ourselves.
-    for (llvm::User *u : old_constant->users())
-        users.push_back(u);
+    for (ui = old_constant->use_begin();
+         ui != old_constant->use_end();
+         ++ui)
+        users.push_back(*ui);
         
     for (size_t i = 0;
          i < users.size();
