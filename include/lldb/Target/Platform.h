@@ -18,6 +18,7 @@
 
 // Other libraries and framework includes
 // Project includes
+#include "lldb/lldb-private-forward.h"
 #include "lldb/lldb-public.h"
 #include "lldb/Core/ArchSpec.h"
 #include "lldb/Core/ConstString.h"
@@ -880,7 +881,7 @@ namespace lldb_private {
         virtual Error
         LaunchDebugProcess (
             ProcessLaunchInfo &launch_info,
-            lldb::NativeProcessProtocolSP &process_sp);
+            NativeProcessProtocolSP &process_sp);
 
     protected:
         bool m_is_host;

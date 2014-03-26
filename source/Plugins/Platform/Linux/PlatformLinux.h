@@ -104,7 +104,7 @@ namespace lldb_private {
         CalculateTrapHandlerSymbolNames ();
 
         Error
-        LaunchDebugProcess (ProcessLaunchInfo &launch_info, lldb::NativeProcessProtocolSP &process_sp) override;
+        LaunchDebugProcess (ProcessLaunchInfo &launch_info, NativeProcessProtocolSP &process_sp) override;
 
     protected:
         lldb::PlatformSP m_remote_platform_sp; // Allow multiple ways to connect to a remote darwin OS

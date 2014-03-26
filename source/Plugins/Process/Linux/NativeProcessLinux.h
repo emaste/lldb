@@ -22,6 +22,7 @@
 #include "lldb/Host/Mutex.h"
 #include "lldb/Target/Process.h"
 
+#include "../../../Host/common/NativeProcessProtocol.h"
 #include "ProcessMessage.h"
 
 namespace lldb_private
@@ -84,14 +85,14 @@ namespace lldb_private
         // ---------------------------------------------------------------------
         static lldb_private::Error
         LaunchProcess (
-            lldb_private::Module *exe_module,
-            lldb_private::ProcessLaunchInfo &launch_info,
-            lldb::NativeProcessProtocolSP &native_process_sp);
+            Module *exe_module,
+            ProcessLaunchInfo &launch_info,
+            NativeProcessProtocolSP &native_process_sp);
 
         static lldb_private::Error
         DoAttachToProcessWithID (
             lldb::pid_t pid,
-            lldb::NativeProcessProtocolSP &native_process_sp);
+            NativeProcessProtocolSP &native_process_sp);
 
         // ---------------------------------------------------------------------
         // Public Instance Methods
@@ -100,18 +101,18 @@ namespace lldb_private
         /// Launches an inferior process ready for debugging.  Forms the
         /// implementation of Process::DoLaunch.
         NativeProcessLinux(
-            lldb_private::Module *module,
+            Module *module,
             char const *argv[],
             char const *envp[],
             const char *stdin_path,
             const char *stdout_path,
             const char *stderr_path,
             const char *working_dir,
-            lldb_private::Error &error);
+            Error &error);
 
         NativeProcessLinux(
             lldb::pid_t pid,
-            lldb_private::Error &error);
+            Error &error);
 
         ~NativeProcessLinux();
 
@@ -130,7 +131,7 @@ namespace lldb_private
         /// FIXME figure out how to set this within the attach logic.
         /// If we have that, then we can get rid of this function.
         void
-        SetArchitecture (const lldb_private::ArchSpec &arch) { m_arch = arch; }
+        SetArchitecture (const ArchSpec &arch) { m_arch = arch; }
 
         /// Returns a file descriptor to the controlling terminal of the inferior
         /// process.

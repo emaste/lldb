@@ -28,7 +28,7 @@ NativeThreadLinux::NativeThreadLinux (NativeProcessLinux *process, lldb::tid_t t
 const char *
 NativeThreadLinux::GetName()
 {
-    lldb::NativeProcessProtocolSP process_sp = m_process_wp.lock ();
+    NativeProcessProtocolSP process_sp = m_process_wp.lock ();
     if (!process_sp)
         return "<unknown: no process>";
 

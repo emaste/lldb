@@ -493,7 +493,7 @@ PlatformLinux::CalculateTrapHandlerSymbolNames ()
 Error
 PlatformLinux::LaunchDebugProcess (
     ProcessLaunchInfo &launch_info,
-    lldb::NativeProcessProtocolSP &process_sp)
+    NativeProcessProtocolSP &process_sp)
 {
     if (!IsHost ())
         return Error("PlatformLinux::%s (): cannot launch a debug process when not the host", __FUNCTION__);

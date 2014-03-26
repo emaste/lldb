@@ -16,6 +16,7 @@
 #include <set>
 // Other libraries and framework includes
 // Project includes
+#include "lldb/lldb-private-forward.h"
 #include "lldb/Host/Mutex.h"
 #include "lldb/Target/Process.h"
 #include "GDBRemoteCommunication.h"
@@ -359,7 +360,7 @@ private:
 
     // private member variables
     lldb_private::Mutex m_debugged_process_mutex;
-    lldb::NativeProcessProtocolSP m_debugged_process_sp;
+    lldb_private::NativeProcessProtocolSP m_debugged_process_sp;
     lldb::DebuggerSP m_debugger_sp;
 
     //------------------------------------------------------------------

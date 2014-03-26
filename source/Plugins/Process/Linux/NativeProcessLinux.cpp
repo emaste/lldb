@@ -1109,7 +1109,7 @@ lldb_private::Error
 NativeProcessLinux::LaunchProcess (
     lldb_private::Module *exe_module,
     lldb_private::ProcessLaunchInfo &launch_info,
-    lldb::NativeProcessProtocolSP &native_process_sp)
+    NativeProcessProtocolSP &native_process_sp)
 {
     Error error;
 
@@ -1170,7 +1170,7 @@ NativeProcessLinux::LaunchProcess (
 lldb_private::Error
 NativeProcessLinux::DoAttachToProcessWithID (
     lldb::pid_t pid,
-    lldb::NativeProcessProtocolSP &native_process_sp)
+    NativeProcessProtocolSP &native_process_sp)
 {
     Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_PROCESS));
     if (log && log->GetMask ().Test (POSIX_LOG_VERBOSE))

@@ -7,20 +7,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-// C Includes
-// C++ Includes
-// Other libraries and framework includes
-// Project includes
 #include "lldb/Target/RegisterContextNativeThread.h"
+
 #include "lldb/Core/DataExtractor.h"
 #include "lldb/Core/RegisterValue.h"
 #include "lldb/Core/Scalar.h"
 #include "lldb/Host/Debug.h"
 #include "lldb/Host/Endian.h"
-// #include "lldb/Target/ExecutionContext.h"
 #include "lldb/Target/StackFrame.h"
-#include "lldb/Target/Process.h"
-#include "lldb/Target/Thread.h"
+
+#include "../Host/common/NativeProcessProtocol.h"
+#include "../Host/common/NativeThreadProtocol.h"
 
 using namespace lldb;
 using namespace lldb_private;
