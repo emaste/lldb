@@ -18,6 +18,7 @@
 #include <vector>
 
 // Other libraries and framework includes
+#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "clang/AST/TemplateBase.h"
 
