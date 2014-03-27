@@ -26,15 +26,28 @@ namespace lldb_private
         virtual
         ~NativeBreakpoint ();
 
-        virtual Error
-        RemoveBreakpoint () = 0;
+        Error
+        Enable ();
+
+        Error
+        Disable ();
 
         lldb::addr_t
         GetAddress () const { return m_addr; }
 
+        bool
+        IsEnabled () const { return m_enabled; }
+
     protected:
         const lldb::addr_t m_addr;
         int32_t m_ref_count;
+        bool m_enabled;
+
+        virtual Error
+        DoEnable () = 0;
+
+        virtual Error
+        DoDisable () = 0;
 
     private:
         // -----------------------------------------------------------

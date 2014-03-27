@@ -93,11 +93,12 @@ NativeBreakpointList::DecRef (lldb::addr_t addr)
         return Error ();
     }
 
-    // Breakpoint has no more references.  Remove it.
+    // Breakpoint has no more references.  Disable it if it's not
+    // already disabled.
     if (log)
         log->Printf ("NativeBreakpointList::%s addr = 0x%" PRIx64 " -- removing due to no remaining references", __FUNCTION__, addr);
 
-    Error error = iter->second->RemoveBreakpoint ();
+    Error error = iter->second->IsEnabled () ? iter->second->Disable () : Error ();
     if (error.Fail ())
     {
         // Log the failure.
@@ -114,4 +115,50 @@ NativeBreakpointList::DecRef (lldb::addr_t addr)
     m_breakpoints.erase (iter);
 
     return error;
+}
+
+Error
+NativeBreakpointList::EnableBreakpoint (lldb::addr_t addr)
+{
+    Log *log (GetLogIfAnyCategoriesSet (LIBLLDB_LOG_BREAKPOINTS));
+    if (log)
+        log->Printf ("NativeBreakpointList::%s addr = 0x%" PRIx64, __FUNCTION__, addr);
+
+    Mutex::Locker locker (m_mutex);
+
+    // Ensure we have said breakpoint.
+    auto iter = m_breakpoints.find (addr);
+    if (iter == m_breakpoints.end ())
+    {
+        // Not found!
+        if (log)
+            log->Printf ("NativeBreakpointList::%s addr = 0x%" PRIx64 " -- NOT FOUND", __FUNCTION__, addr);
+        return Error ("breakpoint not found");
+    }
+
+    // Enable it.
+    return iter->second->Enable ();
+}
+
+Error
+NativeBreakpointList::DisableBreakpoint (lldb::addr_t addr)
+{
+    Log *log (GetLogIfAnyCategoriesSet (LIBLLDB_LOG_BREAKPOINTS));
+    if (log)
+        log->Printf ("NativeBreakpointList::%s addr = 0x%" PRIx64, __FUNCTION__, addr);
+
+    Mutex::Locker locker (m_mutex);
+
+    // Ensure we have said breakpoint.
+    auto iter = m_breakpoints.find (addr);
+    if (iter == m_breakpoints.end ())
+    {
+        // Not found!
+        if (log)
+            log->Printf ("NativeBreakpointList::%s addr = 0x%" PRIx64 " -- NOT FOUND", __FUNCTION__, addr);
+        return Error ("breakpoint not found");
+    }
+
+    // Disable it.
+    return iter->second->Disable ();
 }

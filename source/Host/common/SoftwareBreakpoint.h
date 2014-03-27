@@ -23,8 +23,12 @@ namespace lldb_private
 
         SoftwareBreakpoint (NativeProcessProtocol &process, lldb::addr_t addr, const uint8_t *saved_opcodes, const uint8_t *trap_opcodes, size_t opcode_size);
 
+    protected:
         Error
-        RemoveBreakpoint () override;
+        DoEnable () override;
+
+        Error
+        DoDisable () override;
 
     private:
         /// Max number of bytes that a software trap opcode sequence can occupy.
@@ -34,6 +38,10 @@ namespace lldb_private
         uint8_t m_saved_opcodes [MAX_TRAP_OPCODE_SIZE];
         uint8_t m_trap_opcodes [MAX_TRAP_OPCODE_SIZE];
         const size_t m_opcode_size;
+
+        static Error
+        EnableSoftwareBreakpoint (NativeProcessProtocol &process, lldb::addr_t addr, size_t bp_opcode_size, const uint8_t *bp_opcode_bytes, uint8_t *saved_opcode_bytes);
+
     };
 }
 

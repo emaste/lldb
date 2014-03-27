@@ -103,6 +103,12 @@ namespace lldb_private
         virtual Error
         RemoveBreakpoint (lldb::addr_t addr);
 
+        virtual Error
+        EnableBreakpoint (lldb::addr_t addr);
+
+        virtual Error
+        DisableBreakpoint (lldb::addr_t addr);
+
         //----------------------------------------------------------------------
         // Watchpoint functions
         //----------------------------------------------------------------------

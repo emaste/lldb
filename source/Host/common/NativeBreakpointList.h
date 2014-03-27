@@ -34,6 +34,12 @@ namespace lldb_private
         DecRef (lldb::addr_t addr);
 
         Error
+        EnableBreakpoint (lldb::addr_t addr);
+
+        Error
+        DisableBreakpoint (lldb::addr_t addr);
+
+        Error
         GetBreakpoint (lldb::addr_t addr, NativeBreakpointSP &breakpoint_sp);
 
     private:

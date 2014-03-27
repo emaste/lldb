@@ -262,34 +262,16 @@ Error
 NativeProcessProtocol::RemoveBreakpoint (lldb::addr_t addr)
 {
     return m_breakpoint_list.DecRef (addr);
-#if 0
-    Log *log (GetLogIfAnyCategoriesSet (LIBLLDB_LOG_BREAKPOINTS));
-    if (log)
-        log->Printf ("NativeProcessProtocol::%s addr = 0x%" PRIx64, __FUNCTION__, addr);
+}
 
-    Mutex::Locker locker (m_breakpoint_mutex);
+Error
+NativeProcessProtocol::EnableBreakpoint (lldb::addr_t addr)
+{
+    return m_breakpoint_list.EnableBreakpoint (addr);
+}
 
-    // Find the BreakpointerRemover for the breakpoint.
-    auto iter = std::find_if (m_breakpoints.begin (), m_breakpoints.end (),
-            [addr] (std::vector<NativeBreakpointSP>::iterator &it)->bool { return it->GetAddress () == addr; } );
-    if (iter == m_breakpoints.end ())
-    {
-        if (log)
-            log->Printf ("NativeProcessProtocol::%s: no NativeBreakpoint found for addr = 0x%" PRIx64, __FUNCTION__, addr);
-        return Error ("no breakpoint was found for address 0x%" PRIx64, addr);
-    }
-
-    // Tell the remover to remove the breakoint.
-    Error error = iter->second->RemoveBreakpoint ();
-    if (error.Fail ())
-    {
-        if (log)
-            log->Printf ("NativeProcessProtocol::%s: NativeBreakpoint::RemoveBreakpoint failed for addr = 0x%" PRIx64 ": %s", __FUNCTION__, addr, error.AsCString ());
-    }
-
-    // Eliminate the remover from the list.
-    m_breakpoints.erase (iter);
-
-    return error;
-#endif
+Error
+NativeProcessProtocol::DisableBreakpoint (lldb::addr_t addr)
+{
+    return m_breakpoint_list.DisableBreakpoint (addr);
 }
