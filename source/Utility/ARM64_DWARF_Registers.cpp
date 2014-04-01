@@ -7,8 +7,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <string.h>
-
 #include "ARM64_DWARF_Registers.h"
 
 using namespace lldb;
