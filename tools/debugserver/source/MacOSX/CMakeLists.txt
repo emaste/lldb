@@ -1,6 +1,5 @@
 set(LLVM_NO_RTTI 1)
 
-#add_subdirectory(arm64)
 #add_subdirectory(arm)
 add_subdirectory(i386)
 #add_subdirectory(ppc)
@@ -32,8 +31,8 @@ add_lldb_executable(debugserver
   CFData.cpp
   CFString.cpp
   MachException.cpp
-  MachProcess.mm
-  MachTask.mm
+  MachProcess.cpp
+  MachTask.cpp
   MachThread.cpp
   MachThreadList.cpp
   MachVMMemory.cpp

@@ -362,9 +362,6 @@ public:
     
     lldb::SBError
     UnloadImage (uint32_t image_token);
-    
-    lldb::SBError
-    SendEventData (const char *event_data);
 
     %feature("autodoc", "
     Return the number of different thread-origin extended backtraces

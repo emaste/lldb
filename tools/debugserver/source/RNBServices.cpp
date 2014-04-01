@@ -22,9 +22,7 @@
 #import "DNBLog.h"
 #include "MacOSX/CFUtils.h"
 
-// For now only SpringBoard has a notion of "Applications" that it can list for us.
-// So we have to use the SpringBoard API's here.
-#if defined (WITH_SPRINGBOARD) || defined (WITH_BKS)
+#ifdef WITH_SPRINGBOARD
 #import <SpringBoardServices/SpringBoardServices.h>
 #endif
 
@@ -32,7 +30,7 @@
 size_t GetAllInfos (std::vector<struct kinfo_proc>& proc_infos);
 
 int
-GetProcesses (CFMutableArrayRef plistMutableArray, bool all_users)
+GetPrcoesses (CFMutableArrayRef plistMutableArray, bool all_users)
 {
     if (plistMutableArray == NULL)
         return -1;
@@ -132,12 +130,13 @@ ListApplications(std::string& plist, bool opt_runningApps, bool opt_debuggable)
 
     const uid_t our_uid = getuid();
 
-#if defined (WITH_SPRINGBOARD) || defined (WITH_BKS)
+#ifdef WITH_SPRINGBOARD
+
     
     if (our_uid == 0)
     {
         bool all_users = true;
-        result = GetProcesses (plistMutableArray.get(), all_users);
+        result = GetPrcoesses (plistMutableArray.get(), all_users);
     }
     else
     {
@@ -191,10 +190,10 @@ ListApplications(std::string& plist, bool opt_runningApps, bool opt_debuggable)
             ::CFArrayAppendValue (plistMutableArray.get(), appInfoDict.get());
         }
     }
-#else // #if defined (WITH_SPRINGBOARD) || defined (WITH_BKS)
+#else
     // When root, show all processes
     bool all_users = (our_uid == 0);
-    result = GetProcesses (plistMutableArray.get(), all_users);
+    result = GetPrcoesses (plistMutableArray.get(), all_users);
 #endif
     
     CFReleaser<CFDataRef> plistData (::CFPropertyListCreateXMLData (alloc, plistMutableArray.get()));
@@ -224,3 +223,16 @@ ListApplications(std::string& plist, bool opt_runningApps, bool opt_debuggable)
     return result;
 
 }
+
+
+bool
+IsSBProcess (nub_process_t pid)
+{
+#ifdef WITH_SPRINGBOARD
+    CFReleaser<CFArrayRef> appIdsForPID (::SBSCopyDisplayIdentifiersForProcessID(pid));
+    return appIdsForPID.get() != NULL;
+#else
+    return false;
+#endif
+}
+

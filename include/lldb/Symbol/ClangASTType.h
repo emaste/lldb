@@ -155,9 +155,6 @@ public:
     bool
     IsFunctionType (bool *is_variadic_ptr = NULL) const;
 
-    uint32_t
-    IsHomogeneousAggregate (ClangASTType* base_type_ptr) const;
-
     size_t
     GetNumberOfFunctionArguments () const;
     

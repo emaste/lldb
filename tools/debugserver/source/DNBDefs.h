@@ -23,7 +23,7 @@
 //----------------------------------------------------------------------
 // Define nub_addr_t and the invalid address value from the architecture
 //----------------------------------------------------------------------
-#if defined (__x86_64__) || defined (__ppc64__) || defined (__arm64__)
+#if defined (__x86_64__) || defined (__ppc64__)
 
 //----------------------------------------------------------------------
 // 64 bit address architectures
@@ -90,15 +90,11 @@ typedef enum
 typedef enum
 {
     eLaunchFlavorDefault = 0,
-    eLaunchFlavorPosixSpawn = 1,
-    eLaunchFlavorForkExec = 2,
+    eLaunchFlavorPosixSpawn,
+    eLaunchFlavorForkExec,
 #ifdef WITH_SPRINGBOARD
-    eLaunchFlavorSpringBoard = 3,
+    eLaunchFlavorSpringBoard,
 #endif
-#ifdef WITH_BKS
-    eLaunchFlavorBKS = 4
-#endif
-
 } nub_launch_flavor_t;
 
 #define NUB_STATE_IS_RUNNING(s) ((s) == eStateAttaching ||\

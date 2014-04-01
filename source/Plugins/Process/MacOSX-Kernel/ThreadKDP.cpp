@@ -26,7 +26,6 @@
 #include "ProcessKDP.h"
 #include "ProcessKDPLog.h"
 #include "RegisterContextKDP_arm.h"
-#include "RegisterContextKDP_arm64.h"
 #include "RegisterContextKDP_i386.h"
 #include "RegisterContextKDP_x86_64.h"
 #include "Plugins/Process/Utility/StopInfoMachException.h"
@@ -127,9 +126,6 @@ ThreadKDP::CreateRegisterContextForFrame (StackFrame *frame)
             {
                 case llvm::MachO::CPU_TYPE_ARM:
                     reg_ctx_sp.reset (new RegisterContextKDP_arm (*this, concrete_frame_idx));
-                    break;
-                case llvm::MachO::CPU_TYPE_ARM64:
-                    reg_ctx_sp.reset (new RegisterContextKDP_arm64 (*this, concrete_frame_idx));
                     break;
                 case llvm::MachO::CPU_TYPE_I386:
                     reg_ctx_sp.reset (new RegisterContextKDP_i386 (*this, concrete_frame_idx));

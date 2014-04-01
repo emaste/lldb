@@ -159,10 +159,6 @@ public:
 
     int
     SendLaunchArchPacket (const char *arch);
-    
-    int
-    SendLaunchEventDataPacket (const char *data, bool *was_supported = NULL);
-    
     //------------------------------------------------------------------
     /// Sends a "vAttach:PID" where PID is in hex. 
     ///
@@ -498,16 +494,7 @@ public:
     
     bool
     RestoreRegisterState (lldb::tid_t tid, uint32_t save_id);
-
-    const char *
-    GetGDBServerProgramName();
     
-    uint32_t
-    GetGDBServerProgramVersion();
-
-    bool
-    AvoidGPackets(ProcessGDBRemote *process);
-
 protected:
 
     PacketResult
@@ -517,9 +504,6 @@ protected:
 
     bool
     GetCurrentProcessInfo ();
-
-    bool
-    GetGDBServerVersion();
 
     //------------------------------------------------------------------
     // Classes that inherit from GDBRemoteCommunicationClient can see and modify these
@@ -535,7 +519,6 @@ protected:
     lldb_private::LazyBool m_supports_vCont_S;
     lldb_private::LazyBool m_qHostInfo_is_valid;
     lldb_private::LazyBool m_qProcessInfo_is_valid;
-    lldb_private::LazyBool m_qGDBServerVersion_is_valid;
     lldb_private::LazyBool m_supports_alloc_dealloc_memory;
     lldb_private::LazyBool m_supports_memory_region_info;
     lldb_private::LazyBool m_supports_watchpoint_support_info;
@@ -544,7 +527,6 @@ protected:
     lldb_private::LazyBool m_attach_or_wait_reply;
     lldb_private::LazyBool m_prepare_for_reg_writing_reply;
     lldb_private::LazyBool m_supports_p;
-    lldb_private::LazyBool m_avoid_g_packets;
     lldb_private::LazyBool m_supports_QSaveRegisterState;
     lldb_private::LazyBool m_supports_qXfer_auxv_read;
     lldb_private::LazyBool m_supports_qXfer_libraries_read;
@@ -592,8 +574,6 @@ protected:
     std::string m_os_build;
     std::string m_os_kernel;
     std::string m_hostname;
-    std::string m_gdb_server_name; // from reply to qGDBServerVersion, empty if qGDBServerVersion is not supported
-    uint32_t m_gdb_server_version; // from reply to qGDBServerVersion, zero if qGDBServerVersion is not supported
     uint32_t m_default_packet_timeout;
     uint64_t m_max_packet_size;  // as returned by qSupported
     

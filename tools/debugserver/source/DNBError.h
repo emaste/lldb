@@ -26,13 +26,10 @@ public:
     typedef enum
     {
         Generic = 0,
-        MachKernel = 1,
-        POSIX = 2
+        MachKernel,
+        POSIX
 #ifdef WITH_SPRINGBOARD
-        , SpringBoard = 3
-#endif
-#ifdef WITH_BKS
-        , BackBoard = 4
+        , SpringBoard
 #endif
     } FlavorType;
 

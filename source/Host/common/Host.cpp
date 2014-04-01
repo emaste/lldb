@@ -1068,7 +1068,7 @@ Host::GetLLDBPath (PathType path_type, FileSpec &file_spec)
                     if (framework_pos)
                     {
                         framework_pos += strlen("LLDB.framework");
-#if defined (__arm__) || defined (__arm64__)
+#if defined (__arm__)
                         // Shallow bundle
                         *framework_pos = '\0';
 #else
@@ -1076,7 +1076,7 @@ Host::GetLLDBPath (PathType path_type, FileSpec &file_spec)
                         ::strncpy (framework_pos, "/Resources", PATH_MAX - (framework_pos - raw_path));
 #endif
                     }
-#endif  // #if defined (__APPLE__)
+#endif
                     FileSpec::Resolve (raw_path, resolved_path, sizeof(resolved_path));
                     g_lldb_support_exe_dir.SetCString(resolved_path);
                 }

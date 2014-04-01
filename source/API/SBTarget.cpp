@@ -268,17 +268,6 @@ SBLaunchInfo::AddSuppressFileAction (int fd, bool read, bool write)
     return m_opaque_sp->AppendSuppressFileAction(fd, read, write);
 }
 
-void
-SBLaunchInfo::SetLaunchEventData (const char *data)
-{
-    m_opaque_sp->SetLaunchEventData (data);
-}
-
-const char *
-SBLaunchInfo::GetLaunchEventData () const
-{
-    return m_opaque_sp->GetLaunchEventData ();
-}
 
 SBAttachInfo::SBAttachInfo () :
     m_opaque_sp (new ProcessAttachInfo())

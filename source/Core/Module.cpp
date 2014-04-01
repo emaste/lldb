@@ -404,7 +404,6 @@ Module::GetClangASTContext ()
                 && object_arch.GetTriple().getOS() == llvm::Triple::UnknownOS)
             {
                 if (object_arch.GetTriple().getArch() == llvm::Triple::arm || 
-                    object_arch.GetTriple().getArch() == llvm::Triple::arm64 ||
                     object_arch.GetTriple().getArch() == llvm::Triple::thumb)
                 {
                     object_arch.GetTriple().setOS(llvm::Triple::IOS);
