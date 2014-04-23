@@ -31,15 +31,13 @@ namespace lldb_private
     class Module;
     class Scalar;
 
-    class Operation;
-
-/// @class NativeProcessLinux
-/// @brief Manages communication with the inferior (debugee) process.
-///
-/// Upon construction, this class prepares and launches an inferior process for
-/// debugging.
-///
-/// Changes in the inferior process state are broadcasted.
+    /// @class NativeProcessLinux
+    /// @brief Manages communication with the inferior (debugee) process.
+    ///
+    /// Upon construction, this class prepares and launches an inferior process for
+    /// debugging.
+    ///
+    /// Changes in the inferior process state are broadcasted.
     class NativeProcessLinux: public NativeProcessProtocol
     {
     public:
@@ -288,7 +286,7 @@ namespace lldb_private
         int m_terminal_fd;
 
         // current operation which must be executed on the priviliged thread
-        Operation *m_operation;
+        void *m_operation;
         lldb_private::Mutex m_operation_mutex;
 
         // semaphores notified when Operation is ready to be processed and when
@@ -406,7 +404,7 @@ namespace lldb_private
         GetCrashReasonForSIGBUS(const siginfo_t *info);
 
         void
-        DoOperation(Operation *op);
+        DoOperation(void *op);
 
         /// Stops the child monitor thread.
         void

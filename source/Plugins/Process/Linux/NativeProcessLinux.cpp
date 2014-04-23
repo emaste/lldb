@@ -72,6 +72,16 @@
 // fall back on kill() if tgkill isn't available
 #define tgkill(pid, tid, sig)  syscall(SYS_tgkill, pid, tid, sig)
 
+// We disable the tracing of ptrace calls for integration builds to
+// avoid the additional indirection and checks.
+#ifndef LLDB_CONFIGURATION_BUILDANDINTEGRATION
+#define PTRACE(req, pid, addr, data, data_size) \
+    PtraceWrapper((req), (pid), (addr), (data), (data_size), #req, __FILE__, __LINE__)
+#else
+#define PTRACE(req, pid, addr, data, data_size) \
+    PtraceWrapper((req), (pid), (addr), (data), (data_size))
+#endif
+
 // Private bits we only need internally.
 namespace
 {
@@ -277,179 +287,754 @@ namespace
             result = ptrace(static_cast<__ptrace_request>(req), static_cast<::pid_t>(pid), addr, data);
         return result;
     }
-}
 
-using namespace lldb_private;
+    //------------------------------------------------------------------------------
+    // Static implementations of NativeProcessLinux::ReadMemory and
+    // NativeProcessLinux::WriteMemory.  This enables mutual recursion between these
+    // functions without needed to go thru the thread funnel.
 
-// FIXME: this code is host-dependent with respect to types and
-// endianness and needs to be fixed.  For example, lldb::addr_t is
-// hard-coded to uint64_t, but on a 32-bit Linux host, ptrace requires
-// 32-bit pointer arguments.  This code uses casts to work around the
-// problem.
-
-// We disable the tracing of ptrace calls for integration builds to
-// avoid the additional indirection and checks.
-#ifndef LLDB_CONFIGURATION_BUILDANDINTEGRATION
-#define PTRACE(req, pid, addr, data, data_size) \
-    PtraceWrapper((req), (pid), (addr), (data), (data_size), #req, __FILE__, __LINE__)
-#else
-#define PTRACE(req, pid, addr, data, data_size) \
-    PtraceWrapper((req), (pid), (addr), (data), (data_size))
-#endif
-
-//------------------------------------------------------------------------------
-// Static implementations of NativeProcessLinux::ReadMemory and
-// NativeProcessLinux::WriteMemory.  This enables mutual recursion between these
-// functions without needed to go thru the thread funnel.
-
-static lldb::addr_t
-DoReadMemory (
-    lldb::pid_t pid,
-    lldb::addr_t vm_addr,
-    void *buf,
-    lldb::addr_t size,
-    Error &error)
-{
-    // ptrace word size is determined by the host, not the child
-    static const unsigned word_size = sizeof(void*);
-    unsigned char *dst = static_cast<unsigned char*>(buf);
-    lldb::addr_t bytes_read;
-    lldb::addr_t remainder;
-    long data;
-
-    Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_ALL));
-    if (log)
-        ProcessPOSIXLog::IncNestLevel();
-    if (log && ProcessPOSIXLog::AtTopNestLevel() && log->GetMask().Test(POSIX_LOG_MEMORY))
-        log->Printf ("NativeProcessLinux::%s(%" PRIu64 ", %d, %p, %p, %zd, _)", __FUNCTION__,
-                     pid, word_size, (void*)vm_addr, buf, size);
-
-    assert(sizeof(data) >= word_size);
-    for (bytes_read = 0; bytes_read < size; bytes_read += remainder)
+    static lldb::addr_t
+    DoReadMemory (
+        lldb::pid_t pid,
+        lldb::addr_t vm_addr,
+        void *buf,
+        lldb::addr_t size,
+        Error &error)
     {
-        errno = 0;
-        data = PTRACE(PTRACE_PEEKDATA, pid, (void*)vm_addr, NULL, 0);
-        if (errno)
+        // ptrace word size is determined by the host, not the child
+        static const unsigned word_size = sizeof(void*);
+        unsigned char *dst = static_cast<unsigned char*>(buf);
+        lldb::addr_t bytes_read;
+        lldb::addr_t remainder;
+        long data;
+
+        Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_ALL));
+        if (log)
+            ProcessPOSIXLog::IncNestLevel();
+        if (log && ProcessPOSIXLog::AtTopNestLevel() && log->GetMask().Test(POSIX_LOG_MEMORY))
+            log->Printf ("NativeProcessLinux::%s(%" PRIu64 ", %d, %p, %p, %zd, _)", __FUNCTION__,
+                    pid, word_size, (void*)vm_addr, buf, size);
+
+        assert(sizeof(data) >= word_size);
+        for (bytes_read = 0; bytes_read < size; bytes_read += remainder)
         {
-            error.SetErrorToErrno();
-            if (log)
-                ProcessPOSIXLog::DecNestLevel();
-            return bytes_read;
-        }
+            errno = 0;
+            data = PTRACE(PTRACE_PEEKDATA, pid, (void*)vm_addr, NULL, 0);
+            if (errno)
+            {
+                error.SetErrorToErrno();
+                if (log)
+                    ProcessPOSIXLog::DecNestLevel();
+                return bytes_read;
+            }
 
-        remainder = size - bytes_read;
-        remainder = remainder > word_size ? word_size : remainder;
+            remainder = size - bytes_read;
+            remainder = remainder > word_size ? word_size : remainder;
 
-        // Copy the data into our buffer
-        for (unsigned i = 0; i < remainder; ++i)
-            dst[i] = ((data >> i*8) & 0xFF);
+            // Copy the data into our buffer
+            for (unsigned i = 0; i < remainder; ++i)
+                dst[i] = ((data >> i*8) & 0xFF);
 
-        if (log && ProcessPOSIXLog::AtTopNestLevel() &&
-            (log->GetMask().Test(POSIX_LOG_MEMORY_DATA_LONG) ||
-             (log->GetMask().Test(POSIX_LOG_MEMORY_DATA_SHORT) &&
-              size <= POSIX_LOG_MEMORY_SHORT_BYTES)))
+            if (log && ProcessPOSIXLog::AtTopNestLevel() &&
+                    (log->GetMask().Test(POSIX_LOG_MEMORY_DATA_LONG) ||
+                            (log->GetMask().Test(POSIX_LOG_MEMORY_DATA_SHORT) &&
+                                    size <= POSIX_LOG_MEMORY_SHORT_BYTES)))
             {
                 uintptr_t print_dst = 0;
                 // Format bytes from data by moving into print_dst for log output
                 for (unsigned i = 0; i < remainder; ++i)
                     print_dst |= (((data >> i*8) & 0xFF) << i*8);
                 log->Printf ("NativeProcessLinux::%s() [%p]:0x%lx (0x%lx)", __FUNCTION__,
-                             (void*)vm_addr, print_dst, (unsigned long)data);
+                        (void*)vm_addr, print_dst, (unsigned long)data);
             }
 
-        vm_addr += word_size;
-        dst += word_size;
+            vm_addr += word_size;
+            dst += word_size;
+        }
+
+        if (log)
+            ProcessPOSIXLog::DecNestLevel();
+        return bytes_read;
     }
 
-    if (log)
-        ProcessPOSIXLog::DecNestLevel();
-    return bytes_read;
-}
-
-static lldb::addr_t
-DoWriteMemory(
-    lldb::pid_t pid,
-    lldb::addr_t vm_addr,
-    const void *buf,
-    lldb::addr_t size,
-    Error &error)
-{
-    // ptrace word size is determined by the host, not the child
-    static const unsigned word_size = sizeof(void*);
-    const unsigned char *src = static_cast<const unsigned char*>(buf);
-    lldb::addr_t bytes_written = 0;
-    lldb::addr_t remainder;
-
-    Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_ALL));
-    if (log)
-        ProcessPOSIXLog::IncNestLevel();
-    if (log && ProcessPOSIXLog::AtTopNestLevel() && log->GetMask().Test(POSIX_LOG_MEMORY))
-        log->Printf ("NativeProcessLinux::%s(%" PRIu64 ", %u, %p, %p, %" PRIu64 ")", __FUNCTION__,
-                     pid, word_size, (void*)vm_addr, buf, size);
-
-    for (bytes_written = 0; bytes_written < size; bytes_written += remainder)
+    static lldb::addr_t
+    DoWriteMemory(
+        lldb::pid_t pid,
+        lldb::addr_t vm_addr,
+        const void *buf,
+        lldb::addr_t size,
+        Error &error)
     {
-        remainder = size - bytes_written;
-        remainder = remainder > word_size ? word_size : remainder;
+        // ptrace word size is determined by the host, not the child
+        static const unsigned word_size = sizeof(void*);
+        const unsigned char *src = static_cast<const unsigned char*>(buf);
+        lldb::addr_t bytes_written = 0;
+        lldb::addr_t remainder;
 
-        if (remainder == word_size)
+        Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_ALL));
+        if (log)
+            ProcessPOSIXLog::IncNestLevel();
+        if (log && ProcessPOSIXLog::AtTopNestLevel() && log->GetMask().Test(POSIX_LOG_MEMORY))
+            log->Printf ("NativeProcessLinux::%s(%" PRIu64 ", %u, %p, %p, %" PRIu64 ")", __FUNCTION__,
+                    pid, word_size, (void*)vm_addr, buf, size);
+
+        for (bytes_written = 0; bytes_written < size; bytes_written += remainder)
         {
-            unsigned long data = 0;
-            assert(sizeof(data) >= word_size);
-            for (unsigned i = 0; i < word_size; ++i)
-                data |= (unsigned long)src[i] << i*8;
+            remainder = size - bytes_written;
+            remainder = remainder > word_size ? word_size : remainder;
 
-            if (log && ProcessPOSIXLog::AtTopNestLevel() &&
-                (log->GetMask().Test(POSIX_LOG_MEMORY_DATA_LONG) ||
-                 (log->GetMask().Test(POSIX_LOG_MEMORY_DATA_SHORT) &&
-                  size <= POSIX_LOG_MEMORY_SHORT_BYTES)))
-                 log->Printf ("NativeProcessLinux::%s() [%p]:0x%lx (0x%lx)", __FUNCTION__,
-                              (void*)vm_addr, *(unsigned long*)src, data);
-
-            if (PTRACE(PTRACE_POKEDATA, pid, (void*)vm_addr, (void*)data, 0))
+            if (remainder == word_size)
             {
-                error.SetErrorToErrno();
-                if (log)
-                    ProcessPOSIXLog::DecNestLevel();
-                return bytes_written;
+                unsigned long data = 0;
+                assert(sizeof(data) >= word_size);
+                for (unsigned i = 0; i < word_size; ++i)
+                    data |= (unsigned long)src[i] << i*8;
+
+                if (log && ProcessPOSIXLog::AtTopNestLevel() &&
+                        (log->GetMask().Test(POSIX_LOG_MEMORY_DATA_LONG) ||
+                                (log->GetMask().Test(POSIX_LOG_MEMORY_DATA_SHORT) &&
+                                        size <= POSIX_LOG_MEMORY_SHORT_BYTES)))
+                    log->Printf ("NativeProcessLinux::%s() [%p]:0x%lx (0x%lx)", __FUNCTION__,
+                            (void*)vm_addr, *(unsigned long*)src, data);
+
+                if (PTRACE(PTRACE_POKEDATA, pid, (void*)vm_addr, (void*)data, 0))
+                {
+                    error.SetErrorToErrno();
+                    if (log)
+                        ProcessPOSIXLog::DecNestLevel();
+                    return bytes_written;
+                }
             }
+            else
+            {
+                unsigned char buff[8];
+                if (DoReadMemory(pid, vm_addr,
+                                buff, word_size, error) != word_size)
+                {
+                    if (log)
+                        ProcessPOSIXLog::DecNestLevel();
+                    return bytes_written;
+                }
+
+                memcpy(buff, src, remainder);
+
+                if (DoWriteMemory(pid, vm_addr,
+                                buff, word_size, error) != word_size)
+                {
+                    if (log)
+                        ProcessPOSIXLog::DecNestLevel();
+                    return bytes_written;
+                }
+
+                if (log && ProcessPOSIXLog::AtTopNestLevel() &&
+                        (log->GetMask().Test(POSIX_LOG_MEMORY_DATA_LONG) ||
+                                (log->GetMask().Test(POSIX_LOG_MEMORY_DATA_SHORT) &&
+                                        size <= POSIX_LOG_MEMORY_SHORT_BYTES)))
+                    log->Printf ("NativeProcessLinux::%s() [%p]:0x%lx (0x%lx)", __FUNCTION__,
+                            (void*)vm_addr, *(unsigned long*)src, *(unsigned long*)buff);
+            }
+
+            vm_addr += word_size;
+            src += word_size;
         }
+        if (log)
+            ProcessPOSIXLog::DecNestLevel();
+        return bytes_written;
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class Operation
+    /// @brief Represents a NativeProcessLinux operation.
+    ///
+    /// Under Linux, it is not possible to ptrace() from any other thread but the
+    /// one that spawned or attached to the process from the start.  Therefore, when
+    /// a NativeProcessLinux is asked to deliver or change the state of an inferior
+    /// process the operation must be "funneled" to a specific thread to perform the
+    /// task.  The Operation class provides an abstract base for all services the
+    /// NativeProcessLinux must perform via the single virtual function Execute, thus
+    /// encapsulating the code that needs to run in the privileged context.
+    class Operation
+    {
+    public:
+        Operation () : m_error() { }
+
+        virtual
+        ~Operation() {}
+
+        virtual void
+        Execute (NativeProcessLinux *process) = 0;
+
+        const Error &
+        GetError () const { return m_error; }
+
+    protected:
+        Error m_error;
+    };
+
+    //------------------------------------------------------------------------------
+    /// @class ReadOperation
+    /// @brief Implements NativeProcessLinux::ReadMemory.
+    class ReadOperation : public Operation
+    {
+    public:
+        ReadOperation (
+            lldb::addr_t addr,
+            void *buff,
+            lldb::addr_t size,
+            size_t &result) :
+            Operation (),
+            m_addr (addr),
+            m_buff (buff),
+            m_size (size),
+            m_result (result)
+            {
+            }
+
+        void Execute (NativeProcessLinux *process) override;
+
+    private:
+        lldb::addr_t m_addr;
+        void *m_buff;
+        lldb::addr_t m_size;
+        lldb::addr_t &m_result;
+    };
+
+    void
+    ReadOperation::Execute (NativeProcessLinux *process)
+    {
+        m_result = DoReadMemory (process->GetID (), m_addr, m_buff, m_size, m_error);
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class WriteOperation
+    /// @brief Implements NativeProcessLinux::WriteMemory.
+    class WriteOperation : public Operation
+    {
+    public:
+        WriteOperation (
+            lldb::addr_t addr,
+            const void *buff,
+            lldb::addr_t size,
+            lldb::addr_t &result) :
+            Operation (),
+            m_addr (addr),
+            m_buff (buff),
+            m_size (size),
+            m_result (result)
+            {
+            }
+
+        void Execute (NativeProcessLinux *process) override;
+
+    private:
+        lldb::addr_t m_addr;
+        const void *m_buff;
+        lldb::addr_t m_size;
+        lldb::addr_t m_result;
+    };
+
+    void
+    WriteOperation::Execute(NativeProcessLinux *process)
+    {
+        m_result = DoWriteMemory (process->GetID (), m_addr, m_buff, m_size, m_error);
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class ReadRegOperation
+    /// @brief Implements NativeProcessLinux::ReadRegisterValue.
+    class ReadRegOperation : public Operation
+    {
+    public:
+        ReadRegOperation(lldb::tid_t tid, unsigned offset, const char *reg_name,
+                RegisterValue &value, bool &result)
+            : m_tid(tid), m_offset(offset), m_reg_name(reg_name),
+              m_value(value), m_result(result)
+            { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        lldb::tid_t m_tid;
+        uintptr_t m_offset;
+        const char *m_reg_name;
+        RegisterValue &m_value;
+        bool &m_result;
+    };
+
+    void
+    ReadRegOperation::Execute(NativeProcessLinux *monitor)
+    {
+        Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_REGISTERS));
+
+        // Set errno to zero so that we can detect a failed peek.
+        errno = 0;
+        lldb::addr_t data = PTRACE(PTRACE_PEEKUSER, m_tid, (void*)m_offset, NULL, 0);
+        if (errno)
+            m_result = false;
         else
         {
-            unsigned char buff[8];
-            if (DoReadMemory(pid, vm_addr,
-                             buff, word_size, error) != word_size)
-            {
-                if (log)
-                    ProcessPOSIXLog::DecNestLevel();
-                return bytes_written;
-            }
-
-            memcpy(buff, src, remainder);
-
-            if (DoWriteMemory(pid, vm_addr,
-                              buff, word_size, error) != word_size)
-            {
-                if (log)
-                    ProcessPOSIXLog::DecNestLevel();
-                return bytes_written;
-            }
-
-            if (log && ProcessPOSIXLog::AtTopNestLevel() &&
-                (log->GetMask().Test(POSIX_LOG_MEMORY_DATA_LONG) ||
-                 (log->GetMask().Test(POSIX_LOG_MEMORY_DATA_SHORT) &&
-                  size <= POSIX_LOG_MEMORY_SHORT_BYTES)))
-                 log->Printf ("NativeProcessLinux::%s() [%p]:0x%lx (0x%lx)", __FUNCTION__,
-                              (void*)vm_addr, *(unsigned long*)src, *(unsigned long*)buff);
+            m_value = data;
+            m_result = true;
         }
-
-        vm_addr += word_size;
-        src += word_size;
+        if (log)
+            log->Printf ("NativeProcessLinux::%s() reg %s: 0x%" PRIx64, __FUNCTION__,
+                    m_reg_name, data);
     }
-    if (log)
-        ProcessPOSIXLog::DecNestLevel();
-    return bytes_written;
+
+    //------------------------------------------------------------------------------
+    /// @class WriteRegOperation
+    /// @brief Implements NativeProcessLinux::WriteRegisterValue.
+    class WriteRegOperation : public Operation
+    {
+    public:
+        WriteRegOperation(lldb::tid_t tid, unsigned offset, const char *reg_name,
+                const RegisterValue &value, bool &result)
+            : m_tid(tid), m_offset(offset), m_reg_name(reg_name),
+              m_value(value), m_result(result)
+            { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        lldb::tid_t m_tid;
+        uintptr_t m_offset;
+        const char *m_reg_name;
+        const RegisterValue &m_value;
+        bool &m_result;
+    };
+
+    void
+    WriteRegOperation::Execute(NativeProcessLinux *monitor)
+    {
+        void* buf;
+        Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_REGISTERS));
+
+        buf = (void*) m_value.GetAsUInt64();
+
+        if (log)
+            log->Printf ("NativeProcessLinux::%s() reg %s: %p", __FUNCTION__, m_reg_name, buf);
+        if (PTRACE(PTRACE_POKEUSER, m_tid, (void*)m_offset, buf, 0))
+            m_result = false;
+        else
+            m_result = true;
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class ReadGPROperation
+    /// @brief Implements NativeProcessLinux::ReadGPR.
+    class ReadGPROperation : public Operation
+    {
+    public:
+        ReadGPROperation(lldb::tid_t tid, void *buf, size_t buf_size, bool &result)
+            : m_tid(tid), m_buf(buf), m_buf_size(buf_size), m_result(result)
+            { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        lldb::tid_t m_tid;
+        void *m_buf;
+        size_t m_buf_size;
+        bool &m_result;
+    };
+
+    void
+    ReadGPROperation::Execute(NativeProcessLinux *monitor)
+    {
+        if (PTRACE(PTRACE_GETREGS, m_tid, NULL, m_buf, m_buf_size) < 0)
+            m_result = false;
+        else
+            m_result = true;
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class ReadFPROperation
+    /// @brief Implements NativeProcessLinux::ReadFPR.
+    class ReadFPROperation : public Operation
+    {
+    public:
+        ReadFPROperation(lldb::tid_t tid, void *buf, size_t buf_size, bool &result)
+            : m_tid(tid), m_buf(buf), m_buf_size(buf_size), m_result(result)
+            { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        lldb::tid_t m_tid;
+        void *m_buf;
+        size_t m_buf_size;
+        bool &m_result;
+    };
+
+    void
+    ReadFPROperation::Execute(NativeProcessLinux *monitor)
+    {
+        if (PTRACE(PTRACE_GETFPREGS, m_tid, NULL, m_buf, m_buf_size) < 0)
+            m_result = false;
+        else
+            m_result = true;
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class ReadRegisterSetOperation
+    /// @brief Implements NativeProcessLinux::ReadRegisterSet.
+    class ReadRegisterSetOperation : public Operation
+    {
+    public:
+        ReadRegisterSetOperation(lldb::tid_t tid, void *buf, size_t buf_size, unsigned int regset, bool &result)
+            : m_tid(tid), m_buf(buf), m_buf_size(buf_size), m_regset(regset), m_result(result)
+            { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        lldb::tid_t m_tid;
+        void *m_buf;
+        size_t m_buf_size;
+        const unsigned int m_regset;
+        bool &m_result;
+    };
+
+    void
+    ReadRegisterSetOperation::Execute(NativeProcessLinux *monitor)
+    {
+        if (PTRACE(PTRACE_GETREGSET, m_tid, (void *)&m_regset, m_buf, m_buf_size) < 0)
+            m_result = false;
+        else
+            m_result = true;
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class WriteGPROperation
+    /// @brief Implements NativeProcessLinux::WriteGPR.
+    class WriteGPROperation : public Operation
+    {
+    public:
+        WriteGPROperation(lldb::tid_t tid, void *buf, size_t buf_size, bool &result)
+            : m_tid(tid), m_buf(buf), m_buf_size(buf_size), m_result(result)
+            { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        lldb::tid_t m_tid;
+        void *m_buf;
+        size_t m_buf_size;
+        bool &m_result;
+    };
+
+    void
+    WriteGPROperation::Execute(NativeProcessLinux *monitor)
+    {
+        if (PTRACE(PTRACE_SETREGS, m_tid, NULL, m_buf, m_buf_size) < 0)
+            m_result = false;
+        else
+            m_result = true;
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class WriteFPROperation
+    /// @brief Implements NativeProcessLinux::WriteFPR.
+    class WriteFPROperation : public Operation
+    {
+    public:
+        WriteFPROperation(lldb::tid_t tid, void *buf, size_t buf_size, bool &result)
+            : m_tid(tid), m_buf(buf), m_buf_size(buf_size), m_result(result)
+            { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        lldb::tid_t m_tid;
+        void *m_buf;
+        size_t m_buf_size;
+        bool &m_result;
+    };
+
+    void
+    WriteFPROperation::Execute(NativeProcessLinux *monitor)
+    {
+        if (PTRACE(PTRACE_SETFPREGS, m_tid, NULL, m_buf, m_buf_size) < 0)
+            m_result = false;
+        else
+            m_result = true;
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class WriteRegisterSetOperation
+    /// @brief Implements NativeProcessLinux::WriteRegisterSet.
+    class WriteRegisterSetOperation : public Operation
+    {
+    public:
+        WriteRegisterSetOperation(lldb::tid_t tid, void *buf, size_t buf_size, unsigned int regset, bool &result)
+            : m_tid(tid), m_buf(buf), m_buf_size(buf_size), m_regset(regset), m_result(result)
+            { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        lldb::tid_t m_tid;
+        void *m_buf;
+        size_t m_buf_size;
+        const unsigned int m_regset;
+        bool &m_result;
+    };
+
+    void
+    WriteRegisterSetOperation::Execute(NativeProcessLinux *monitor)
+    {
+        if (PTRACE(PTRACE_SETREGSET, m_tid, (void *)&m_regset, m_buf, m_buf_size) < 0)
+            m_result = false;
+        else
+            m_result = true;
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class ReadThreadPointerOperation
+    /// @brief Implements NativeProcessLinux::ReadThreadPointer.
+    class ReadThreadPointerOperation : public Operation
+    {
+    public:
+        ReadThreadPointerOperation(lldb::tid_t tid, lldb::addr_t *addr, bool &result, const ArchSpec &arch) :
+            Operation (),
+            m_tid (tid),
+            m_addr(addr),
+            m_result(result),
+            m_arch (arch)
+            { }
+
+        void
+        Execute(NativeProcessLinux *process) override;
+
+    private:
+        lldb::tid_t m_tid;
+        lldb::addr_t *m_addr;
+        bool &m_result;
+        const ArchSpec &m_arch;
+    };
+
+    void
+    ReadThreadPointerOperation::Execute(NativeProcessLinux *process)
+    {
+        Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_REGISTERS));
+        if (log)
+            log->Printf ("NativeProcessLinux::%s()", __FUNCTION__);
+
+        // The process for getting the thread area on Linux is
+        // somewhat... obscure. There's several different ways depending on
+        // what arch you're on, and what kernel version you have.
+
+        switch(m_arch.GetMachine())
+        {
+        case llvm::Triple::x86:
+        {
+            // Find the GS register location for our host architecture.
+            size_t gs_user_offset = offsetof(struct user, regs);
+#ifdef __x86_64__
+            gs_user_offset += offsetof(struct user_regs_struct, gs);
+#endif
+#ifdef __i386__
+            gs_user_offset += offsetof(struct user_regs_struct, xgs);
+#endif
+
+            // Read the GS register value to get the selector.
+            errno = 0;
+            long gs = PTRACE(PTRACE_PEEKUSER, m_tid, (void*)gs_user_offset, NULL, 0);
+            if (errno)
+            {
+                m_result = false;
+                break;
+            }
+
+            // Read the LDT base for that selector.
+            uint32_t tmp[4];
+            m_result = (PTRACE(PTRACE_GET_THREAD_AREA, m_tid, (void *)(gs >> 3), &tmp, 0) == 0);
+            *m_addr = tmp[1];
+            break;
+        }
+        case llvm::Triple::x86_64:
+            // Read the FS register base.
+            m_result = (PTRACE(PTRACE_ARCH_PRCTL, m_tid, m_addr, (void *)ARCH_GET_FS, 0) == 0);
+            break;
+        default:
+            m_result = false;
+            break;
+        }
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class ResumeOperation
+    /// @brief Implements NativeProcessLinux::Resume.
+    class ResumeOperation : public Operation
+    {
+    public:
+        ResumeOperation(lldb::tid_t tid, uint32_t signo, bool &result) :
+            m_tid(tid), m_signo(signo), m_result(result) { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        lldb::tid_t m_tid;
+        uint32_t m_signo;
+        bool &m_result;
+    };
+
+    void
+    ResumeOperation::Execute(NativeProcessLinux *monitor)
+    {
+        intptr_t data = 0;
+
+        if (m_signo != LLDB_INVALID_SIGNAL_NUMBER)
+            data = m_signo;
+
+        if (PTRACE(PTRACE_CONT, m_tid, NULL, (void*)data, 0))
+        {
+            Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_PROCESS));
+
+            if (log)
+                log->Printf ("ResumeOperation (%"  PRIu64 ") failed: %s", m_tid, strerror(errno));
+            m_result = false;
+        }
+        else
+            m_result = true;
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class SingleStepOperation
+    /// @brief Implements NativeProcessLinux::SingleStep.
+    class SingleStepOperation : public Operation
+    {
+    public:
+        SingleStepOperation(lldb::tid_t tid, uint32_t signo, bool &result)
+            : m_tid(tid), m_signo(signo), m_result(result) { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        lldb::tid_t m_tid;
+        uint32_t m_signo;
+        bool &m_result;
+    };
+
+    void
+    SingleStepOperation::Execute(NativeProcessLinux *monitor)
+    {
+        intptr_t data = 0;
+
+        if (m_signo != LLDB_INVALID_SIGNAL_NUMBER)
+            data = m_signo;
+
+        if (PTRACE(PTRACE_SINGLESTEP, m_tid, NULL, (void*)data, 0))
+            m_result = false;
+        else
+            m_result = true;
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class SiginfoOperation
+    /// @brief Implements NativeProcessLinux::GetSignalInfo.
+    class SiginfoOperation : public Operation
+    {
+    public:
+        SiginfoOperation(lldb::tid_t tid, void *info, bool &result, int &ptrace_err)
+            : m_tid(tid), m_info(info), m_result(result), m_err(ptrace_err) { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        lldb::tid_t m_tid;
+        void *m_info;
+        bool &m_result;
+        int &m_err;
+    };
+
+    void
+    SiginfoOperation::Execute(NativeProcessLinux *monitor)
+    {
+        if (PTRACE(PTRACE_GETSIGINFO, m_tid, NULL, m_info, 0)) {
+            m_result = false;
+            m_err = errno;
+        }
+        else
+            m_result = true;
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class EventMessageOperation
+    /// @brief Implements NativeProcessLinux::GetEventMessage.
+    class EventMessageOperation : public Operation
+    {
+    public:
+        EventMessageOperation(lldb::tid_t tid, unsigned long *message, bool &result)
+            : m_tid(tid), m_message(message), m_result(result) { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        lldb::tid_t m_tid;
+        unsigned long *m_message;
+        bool &m_result;
+    };
+
+    void
+    EventMessageOperation::Execute(NativeProcessLinux *monitor)
+    {
+        if (PTRACE(PTRACE_GETEVENTMSG, m_tid, NULL, m_message, 0))
+            m_result = false;
+        else
+            m_result = true;
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class KillOperation
+    /// @brief Implements NativeProcessLinux::BringProcessIntoLimbo.
+    class KillOperation : public Operation
+    {
+    public:
+        KillOperation(bool &result) : m_result(result) { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        bool &m_result;
+    };
+
+    void
+    KillOperation::Execute(NativeProcessLinux *monitor)
+    {
+        lldb::pid_t pid = monitor->GetID();
+
+        if (PTRACE(PTRACE_KILL, pid, NULL, NULL, 0))
+            m_result = false;
+        else
+            m_result = true;
+    }
+
+    //------------------------------------------------------------------------------
+    /// @class KillOperation
+    /// @brief Implements NativeProcessLinux::BringProcessIntoLimbo.
+    class DetachOperation : public Operation
+    {
+    public:
+        DetachOperation(lldb::tid_t tid, Error &result) : m_tid(tid), m_error(result) { }
+
+        void Execute(NativeProcessLinux *monitor);
+
+    private:
+        lldb::tid_t m_tid;
+        Error &m_error;
+    };
+
+    void
+    DetachOperation::Execute(NativeProcessLinux *monitor)
+    {
+        if (ptrace(PT_DETACH, m_tid, NULL, 0) < 0)
+            m_error.SetErrorToErrno();
+    }
+
 }
+
+using namespace lldb_private;
 
 // Simple helper function to ensure flags are enabled on the given file
 // descriptor.
@@ -471,596 +1056,6 @@ EnsureFDFlags(int fd, int flags, Error &error)
     }
 
     return true;
-}
-
-//------------------------------------------------------------------------------
-/// @class Operation
-/// @brief Represents a NativeProcessLinux operation.
-///
-/// Under Linux, it is not possible to ptrace() from any other thread but the
-/// one that spawned or attached to the process from the start.  Therefore, when
-/// a NativeProcessLinux is asked to deliver or change the state of an inferior
-/// process the operation must be "funneled" to a specific thread to perform the
-/// task.  The Operation class provides an abstract base for all services the
-/// NativeProcessLinux must perform via the single virtual function Execute, thus
-/// encapsulating the code that needs to run in the privileged context.
-class lldb_private::Operation
-{
-public:
-    Operation () : m_error() { }
-
-    virtual
-    ~Operation() {}
-
-    virtual void
-    Execute (NativeProcessLinux *process) = 0;
-
-    const Error &
-    GetError () const { return m_error; }
-
-protected:
-    Error m_error;
-};
-
-//------------------------------------------------------------------------------
-/// @class ReadOperation
-/// @brief Implements NativeProcessLinux::ReadMemory.
-class ReadOperation : public Operation
-{
-public:
-    ReadOperation (
-        lldb::addr_t addr,
-        void *buff,
-        lldb::addr_t size,
-        size_t &result) :
-        Operation (),
-        m_addr (addr),
-        m_buff (buff),
-        m_size (size),
-        m_result (result)
-    {
-    }
-
-    void Execute (NativeProcessLinux *process) override;
-
-private:
-    lldb::addr_t m_addr;
-    void *m_buff;
-    lldb::addr_t m_size;
-    lldb::addr_t &m_result;
-};
-
-void
-ReadOperation::Execute (NativeProcessLinux *process)
-{
-    m_result = DoReadMemory (process->GetID (), m_addr, m_buff, m_size, m_error);
-}
-
-//------------------------------------------------------------------------------
-/// @class WriteOperation
-/// @brief Implements NativeProcessLinux::WriteMemory.
-class WriteOperation : public Operation
-{
-public:
-    WriteOperation (
-        lldb::addr_t addr,
-        const void *buff,
-        lldb::addr_t size,
-        lldb::addr_t &result) :
-        Operation (),
-        m_addr (addr),
-        m_buff (buff),
-        m_size (size),
-        m_result (result)
-    {
-    }
-
-    void Execute (NativeProcessLinux *process) override;
-
-private:
-    lldb::addr_t m_addr;
-    const void *m_buff;
-    lldb::addr_t m_size;
-    lldb::addr_t m_result;
-};
-
-void
-WriteOperation::Execute(NativeProcessLinux *process)
-{
-    m_result = DoWriteMemory (process->GetID (), m_addr, m_buff, m_size, m_error);
-}
-
-//------------------------------------------------------------------------------
-/// @class ReadRegOperation
-/// @brief Implements NativeProcessLinux::ReadRegisterValue.
-class ReadRegOperation : public Operation
-{
-public:
-    ReadRegOperation(lldb::tid_t tid, unsigned offset, const char *reg_name,
-                     RegisterValue &value, bool &result)
-        : m_tid(tid), m_offset(offset), m_reg_name(reg_name),
-          m_value(value), m_result(result)
-        { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    lldb::tid_t m_tid;
-    uintptr_t m_offset;
-    const char *m_reg_name;
-    RegisterValue &m_value;
-    bool &m_result;
-};
-
-void
-ReadRegOperation::Execute(NativeProcessLinux *monitor)
-{
-    Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_REGISTERS));
-
-    // Set errno to zero so that we can detect a failed peek.
-    errno = 0;
-    lldb::addr_t data = PTRACE(PTRACE_PEEKUSER, m_tid, (void*)m_offset, NULL, 0);
-    if (errno)
-        m_result = false;
-    else
-    {
-        m_value = data;
-        m_result = true;
-    }
-    if (log)
-        log->Printf ("NativeProcessLinux::%s() reg %s: 0x%" PRIx64, __FUNCTION__,
-                     m_reg_name, data);
-}
-
-//------------------------------------------------------------------------------
-/// @class WriteRegOperation
-/// @brief Implements NativeProcessLinux::WriteRegisterValue.
-class WriteRegOperation : public Operation
-{
-public:
-    WriteRegOperation(lldb::tid_t tid, unsigned offset, const char *reg_name,
-                      const RegisterValue &value, bool &result)
-        : m_tid(tid), m_offset(offset), m_reg_name(reg_name),
-          m_value(value), m_result(result)
-        { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    lldb::tid_t m_tid;
-    uintptr_t m_offset;
-    const char *m_reg_name;
-    const RegisterValue &m_value;
-    bool &m_result;
-};
-
-void
-WriteRegOperation::Execute(NativeProcessLinux *monitor)
-{
-    void* buf;
-    Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_REGISTERS));
-
-    buf = (void*) m_value.GetAsUInt64();
-
-    if (log)
-        log->Printf ("NativeProcessLinux::%s() reg %s: %p", __FUNCTION__, m_reg_name, buf);
-    if (PTRACE(PTRACE_POKEUSER, m_tid, (void*)m_offset, buf, 0))
-        m_result = false;
-    else
-        m_result = true;
-}
-
-//------------------------------------------------------------------------------
-/// @class ReadGPROperation
-/// @brief Implements NativeProcessLinux::ReadGPR.
-class ReadGPROperation : public Operation
-{
-public:
-    ReadGPROperation(lldb::tid_t tid, void *buf, size_t buf_size, bool &result)
-        : m_tid(tid), m_buf(buf), m_buf_size(buf_size), m_result(result)
-        { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    lldb::tid_t m_tid;
-    void *m_buf;
-    size_t m_buf_size;
-    bool &m_result;
-};
-
-void
-ReadGPROperation::Execute(NativeProcessLinux *monitor)
-{
-    if (PTRACE(PTRACE_GETREGS, m_tid, NULL, m_buf, m_buf_size) < 0)
-        m_result = false;
-    else
-        m_result = true;
-}
-
-//------------------------------------------------------------------------------
-/// @class ReadFPROperation
-/// @brief Implements NativeProcessLinux::ReadFPR.
-class ReadFPROperation : public Operation
-{
-public:
-    ReadFPROperation(lldb::tid_t tid, void *buf, size_t buf_size, bool &result)
-        : m_tid(tid), m_buf(buf), m_buf_size(buf_size), m_result(result)
-        { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    lldb::tid_t m_tid;
-    void *m_buf;
-    size_t m_buf_size;
-    bool &m_result;
-};
-
-void
-ReadFPROperation::Execute(NativeProcessLinux *monitor)
-{
-    if (PTRACE(PTRACE_GETFPREGS, m_tid, NULL, m_buf, m_buf_size) < 0)
-        m_result = false;
-    else
-        m_result = true;
-}
-
-//------------------------------------------------------------------------------
-/// @class ReadRegisterSetOperation
-/// @brief Implements NativeProcessLinux::ReadRegisterSet.
-class ReadRegisterSetOperation : public Operation
-{
-public:
-    ReadRegisterSetOperation(lldb::tid_t tid, void *buf, size_t buf_size, unsigned int regset, bool &result)
-        : m_tid(tid), m_buf(buf), m_buf_size(buf_size), m_regset(regset), m_result(result)
-        { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    lldb::tid_t m_tid;
-    void *m_buf;
-    size_t m_buf_size;
-    const unsigned int m_regset;
-    bool &m_result;
-};
-
-void
-ReadRegisterSetOperation::Execute(NativeProcessLinux *monitor)
-{
-    if (PTRACE(PTRACE_GETREGSET, m_tid, (void *)&m_regset, m_buf, m_buf_size) < 0)
-        m_result = false;
-    else
-        m_result = true;
-}
-
-//------------------------------------------------------------------------------
-/// @class WriteGPROperation
-/// @brief Implements NativeProcessLinux::WriteGPR.
-class WriteGPROperation : public Operation
-{
-public:
-    WriteGPROperation(lldb::tid_t tid, void *buf, size_t buf_size, bool &result)
-        : m_tid(tid), m_buf(buf), m_buf_size(buf_size), m_result(result)
-        { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    lldb::tid_t m_tid;
-    void *m_buf;
-    size_t m_buf_size;
-    bool &m_result;
-};
-
-void
-WriteGPROperation::Execute(NativeProcessLinux *monitor)
-{
-    if (PTRACE(PTRACE_SETREGS, m_tid, NULL, m_buf, m_buf_size) < 0)
-        m_result = false;
-    else
-        m_result = true;
-}
-
-//------------------------------------------------------------------------------
-/// @class WriteFPROperation
-/// @brief Implements NativeProcessLinux::WriteFPR.
-class WriteFPROperation : public Operation
-{
-public:
-    WriteFPROperation(lldb::tid_t tid, void *buf, size_t buf_size, bool &result)
-        : m_tid(tid), m_buf(buf), m_buf_size(buf_size), m_result(result)
-        { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    lldb::tid_t m_tid;
-    void *m_buf;
-    size_t m_buf_size;
-    bool &m_result;
-};
-
-void
-WriteFPROperation::Execute(NativeProcessLinux *monitor)
-{
-    if (PTRACE(PTRACE_SETFPREGS, m_tid, NULL, m_buf, m_buf_size) < 0)
-        m_result = false;
-    else
-        m_result = true;
-}
-
-//------------------------------------------------------------------------------
-/// @class WriteRegisterSetOperation
-/// @brief Implements NativeProcessLinux::WriteRegisterSet.
-class WriteRegisterSetOperation : public Operation
-{
-public:
-    WriteRegisterSetOperation(lldb::tid_t tid, void *buf, size_t buf_size, unsigned int regset, bool &result)
-        : m_tid(tid), m_buf(buf), m_buf_size(buf_size), m_regset(regset), m_result(result)
-        { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    lldb::tid_t m_tid;
-    void *m_buf;
-    size_t m_buf_size;
-    const unsigned int m_regset;
-    bool &m_result;
-};
-
-void
-WriteRegisterSetOperation::Execute(NativeProcessLinux *monitor)
-{
-    if (PTRACE(PTRACE_SETREGSET, m_tid, (void *)&m_regset, m_buf, m_buf_size) < 0)
-        m_result = false;
-    else
-        m_result = true;
-}
-
-//------------------------------------------------------------------------------
-/// @class ReadThreadPointerOperation
-/// @brief Implements NativeProcessLinux::ReadThreadPointer.
-class ReadThreadPointerOperation : public Operation
-{
-public:
-    ReadThreadPointerOperation(lldb::tid_t tid, lldb::addr_t *addr, bool &result, const ArchSpec &arch) :
-        Operation (),
-        m_tid (tid),
-        m_addr(addr),
-        m_result(result),
-        m_arch (arch)
-        { }
-
-    void
-    Execute(NativeProcessLinux *process) override;
-
-private:
-    lldb::tid_t m_tid;
-    lldb::addr_t *m_addr;
-    bool &m_result;
-    const ArchSpec &m_arch;
-};
-
-void
-ReadThreadPointerOperation::Execute(NativeProcessLinux *process)
-{
-    Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_REGISTERS));
-    if (log)
-        log->Printf ("NativeProcessLinux::%s()", __FUNCTION__);
-
-    // The process for getting the thread area on Linux is
-    // somewhat... obscure. There's several different ways depending on
-    // what arch you're on, and what kernel version you have.
-
-    switch(m_arch.GetMachine())
-    {
-    case llvm::Triple::x86:
-    {
-        // Find the GS register location for our host architecture.
-        size_t gs_user_offset = offsetof(struct user, regs);
-#ifdef __x86_64__
-        gs_user_offset += offsetof(struct user_regs_struct, gs);
-#endif
-#ifdef __i386__
-        gs_user_offset += offsetof(struct user_regs_struct, xgs);
-#endif
-
-        // Read the GS register value to get the selector.
-        errno = 0;
-        long gs = PTRACE(PTRACE_PEEKUSER, m_tid, (void*)gs_user_offset, NULL, 0);
-        if (errno)
-        {
-            m_result = false;
-            break;
-        }
-
-        // Read the LDT base for that selector.
-        uint32_t tmp[4];
-        m_result = (PTRACE(PTRACE_GET_THREAD_AREA, m_tid, (void *)(gs >> 3), &tmp, 0) == 0);
-        *m_addr = tmp[1];
-        break;
-    }
-    case llvm::Triple::x86_64:
-        // Read the FS register base.
-        m_result = (PTRACE(PTRACE_ARCH_PRCTL, m_tid, m_addr, (void *)ARCH_GET_FS, 0) == 0);
-        break;
-    default:
-        m_result = false;
-        break;
-    }
-}
-
-//------------------------------------------------------------------------------
-/// @class ResumeOperation
-/// @brief Implements NativeProcessLinux::Resume.
-class ResumeOperation : public Operation
-{
-public:
-    ResumeOperation(lldb::tid_t tid, uint32_t signo, bool &result) :
-        m_tid(tid), m_signo(signo), m_result(result) { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    lldb::tid_t m_tid;
-    uint32_t m_signo;
-    bool &m_result;
-};
-
-void
-ResumeOperation::Execute(NativeProcessLinux *monitor)
-{
-    intptr_t data = 0;
-
-    if (m_signo != LLDB_INVALID_SIGNAL_NUMBER)
-        data = m_signo;
-
-    if (PTRACE(PTRACE_CONT, m_tid, NULL, (void*)data, 0))
-    {
-        Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_PROCESS));
-
-        if (log)
-            log->Printf ("ResumeOperation (%"  PRIu64 ") failed: %s", m_tid, strerror(errno));
-        m_result = false;
-    }
-    else
-        m_result = true;
-}
-
-//------------------------------------------------------------------------------
-/// @class SingleStepOperation
-/// @brief Implements NativeProcessLinux::SingleStep.
-class SingleStepOperation : public Operation
-{
-public:
-    SingleStepOperation(lldb::tid_t tid, uint32_t signo, bool &result)
-        : m_tid(tid), m_signo(signo), m_result(result) { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    lldb::tid_t m_tid;
-    uint32_t m_signo;
-    bool &m_result;
-};
-
-void
-SingleStepOperation::Execute(NativeProcessLinux *monitor)
-{
-    intptr_t data = 0;
-
-    if (m_signo != LLDB_INVALID_SIGNAL_NUMBER)
-        data = m_signo;
-
-    if (PTRACE(PTRACE_SINGLESTEP, m_tid, NULL, (void*)data, 0))
-        m_result = false;
-    else
-        m_result = true;
-}
-
-//------------------------------------------------------------------------------
-/// @class SiginfoOperation
-/// @brief Implements NativeProcessLinux::GetSignalInfo.
-class SiginfoOperation : public Operation
-{
-public:
-    SiginfoOperation(lldb::tid_t tid, void *info, bool &result, int &ptrace_err)
-        : m_tid(tid), m_info(info), m_result(result), m_err(ptrace_err) { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    lldb::tid_t m_tid;
-    void *m_info;
-    bool &m_result;
-    int &m_err;
-};
-
-void
-SiginfoOperation::Execute(NativeProcessLinux *monitor)
-{
-    if (PTRACE(PTRACE_GETSIGINFO, m_tid, NULL, m_info, 0)) {
-        m_result = false;
-        m_err = errno;
-    }
-    else
-        m_result = true;
-}
-
-//------------------------------------------------------------------------------
-/// @class EventMessageOperation
-/// @brief Implements NativeProcessLinux::GetEventMessage.
-class EventMessageOperation : public Operation
-{
-public:
-    EventMessageOperation(lldb::tid_t tid, unsigned long *message, bool &result)
-        : m_tid(tid), m_message(message), m_result(result) { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    lldb::tid_t m_tid;
-    unsigned long *m_message;
-    bool &m_result;
-};
-
-void
-EventMessageOperation::Execute(NativeProcessLinux *monitor)
-{
-    if (PTRACE(PTRACE_GETEVENTMSG, m_tid, NULL, m_message, 0))
-        m_result = false;
-    else
-        m_result = true;
-}
-
-//------------------------------------------------------------------------------
-/// @class KillOperation
-/// @brief Implements NativeProcessLinux::BringProcessIntoLimbo.
-class KillOperation : public Operation
-{
-public:
-    KillOperation(bool &result) : m_result(result) { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    bool &m_result;
-};
-
-void
-KillOperation::Execute(NativeProcessLinux *monitor)
-{
-    lldb::pid_t pid = monitor->GetID();
-
-    if (PTRACE(PTRACE_KILL, pid, NULL, NULL, 0))
-        m_result = false;
-    else
-        m_result = true;
-}
-
-//------------------------------------------------------------------------------
-/// @class KillOperation
-/// @brief Implements NativeProcessLinux::BringProcessIntoLimbo.
-class DetachOperation : public Operation
-{
-public:
-    DetachOperation(lldb::tid_t tid, Error &result) : m_tid(tid), m_error(result) { }
-
-    void Execute(NativeProcessLinux *monitor);
-
-private:
-    lldb::tid_t m_tid;
-    Error &m_error;
-};
-
-void
-DetachOperation::Execute(NativeProcessLinux *monitor)
-{
-    if (ptrace(PT_DETACH, m_tid, NULL, 0) < 0)
-        m_error.SetErrorToErrno();
 }
 
 NativeProcessLinux::OperationArgs::OperationArgs(NativeProcessLinux *monitor)
@@ -1265,7 +1260,7 @@ NativeProcessLinux::NativeProcessLinux (
     m_operation_thread (LLDB_INVALID_HOST_THREAD),
     m_monitor_thread (LLDB_INVALID_HOST_THREAD),
     m_terminal_fd (-1),
-    m_operation (0)
+    m_operation (nullptr)
 {
     SetState(eStateLaunching);
 
@@ -1323,7 +1318,7 @@ NativeProcessLinux::NativeProcessLinux (
     m_operation_thread (LLDB_INVALID_HOST_THREAD),
     m_monitor_thread (LLDB_INVALID_HOST_THREAD),
     m_terminal_fd (-1),
-    m_operation (0)
+    m_operation (nullptr)
 {
     SetState(eStateAttaching);
 
@@ -2601,7 +2596,7 @@ NativeProcessLinux::ServeOperation(OperationArgs *args)
             assert(false && "Unexpected errno from sem_wait");
         }
 
-        monitor->m_operation->Execute(monitor);
+        reinterpret_cast<Operation*>(monitor->m_operation)->Execute(monitor);
 
         // notify calling thread that operation is complete
         sem_post(&monitor->m_operation_done);
@@ -2609,7 +2604,7 @@ NativeProcessLinux::ServeOperation(OperationArgs *args)
 }
 
 void
-NativeProcessLinux::DoOperation(Operation *op)
+NativeProcessLinux::DoOperation(void *op)
 {
     Mutex::Locker lock(m_operation_mutex);
 
