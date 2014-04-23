@@ -42,6 +42,13 @@ NativeThreadLinux::GetState ()
     return m_state;
 }
 
+bool
+NativeThreadLinux::GetStopReason (ThreadStopInfo &stop_info)
+{
+    // TODO implement
+    return false;
+}
+
 void
 NativeThreadLinux::SetRunning ()
 {

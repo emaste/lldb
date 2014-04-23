@@ -2162,6 +2162,54 @@ NativeProcessLinux::DeallocateMemory (lldb::addr_t addr)
     return Error ("not implemented");
 }
 
+lldb::addr_t
+NativeProcessLinux::GetSharedLibraryInfoAddress ()
+{
+#if 1
+    // punt on this for now
+    return LLDB_INVALID_ADDRESS;
+#else
+    // Return the image info address for the exe module
+#if 1
+    Log *log (GetLogIfAllCategoriesSet (LIBLLDB_LOG_PROCESS));
+
+    ModuleSP module_sp;
+    Error error = GetExeModuleSP (module_sp);
+    if (error.Fail ())
+    {
+         if (log)
+            log->Warning ("NativeProcessLinux::%s failed to retrieve exe module: %s", __FUNCTION__, error.AsCString ());
+        return LLDB_INVALID_ADDRESS;
+    }
+
+    if (module_sp == nullptr)
+    {
+         if (log)
+            log->Warning ("NativeProcessLinux::%s exe module returned was NULL", __FUNCTION__);
+         return LLDB_INVALID_ADDRESS;
+    }
+
+    ObjectFileSP object_file_sp = module_sp->GetObjectFile ();
+    if (object_file_sp == nullptr)
+    {
+         if (log)
+            log->Warning ("NativeProcessLinux::%s exe module returned a NULL object file", __FUNCTION__);
+         return LLDB_INVALID_ADDRESS;
+    }
+
+    return obj_file_sp->GetImageInfoAddress();
+#else
+    Target *target = &GetTarget();
+    ObjectFile *obj_file = target->GetExecutableModule()->GetObjectFile();
+    Address addr = obj_file->GetImageInfoAddress(target);
+
+    if (addr.IsValid())
+        return addr.GetLoadAddress(target);
+    return LLDB_INVALID_ADDRESS;
+#endif
+#endif // punt on this for now
+}
+
 size_t
 NativeProcessLinux::UpdateThreads ()
 {
