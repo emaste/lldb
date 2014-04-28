@@ -213,7 +213,7 @@ namespace lldb_private
             ~NativeDelegate () {}
 
             virtual
-            void Initialize (NativeProcessProtocol *process) = 0;
+            void InitializeDelegate (NativeProcessProtocol *process) = 0;
 
             virtual
             void ProcessStateChanged (NativeProcessProtocol *process, lldb::StateType state) = 0;

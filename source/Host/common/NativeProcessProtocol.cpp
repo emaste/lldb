@@ -221,7 +221,7 @@ NativeProcessProtocol::RegisterNativeDelegate (NativeDelegate &native_delegate)
         return false;
 
     m_delegates.push_back (&native_delegate);
-    native_delegate.Initialize (this);
+    native_delegate.InitializeDelegate (this);
     return true;
 }
 

@@ -1189,10 +1189,11 @@ Platform::CalculateMD5 (const FileSpec& file_spec,
 Error
 Platform::LaunchDebugProcess (
     ProcessLaunchInfo &launch_info,
+    lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
     NativeProcessProtocolSP &process_sp)
 {
-    // right now we're having each platform individually implement
-    // this since there are some diffs in impls.
+    // Platforms should override this implementation if they want to
+    // support lldb-gdbserver.
     return Error("unimplemented");
 }
 

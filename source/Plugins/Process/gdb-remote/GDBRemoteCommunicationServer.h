@@ -21,10 +21,14 @@
 #include "lldb/Target/Process.h"
 #include "GDBRemoteCommunication.h"
 
+#include "../../../Host/common/NativeProcessProtocol.h"
+
 class ProcessGDBRemote;
 class StringExtractorGDBRemote;
 
-class GDBRemoteCommunicationServer : public GDBRemoteCommunication
+class GDBRemoteCommunicationServer :
+    public GDBRemoteCommunication,
+    public lldb_private::NativeProcessProtocol::NativeDelegate
 {
 public:
     typedef std::map<uint16_t, lldb::pid_t> PortMap;
@@ -189,6 +193,12 @@ public:
     //------------------------------------------------------------------
     lldb_private::Error
     LaunchProcess ();
+
+    //------------------------------------------------------------------
+    // NativeProcessProtocol::NativeDelegate overrides
+    //------------------------------------------------------------------
+    void InitializeDelegate (lldb_private::NativeProcessProtocol *process) override;
+    void ProcessStateChanged (lldb_private::NativeProcessProtocol *process, lldb::StateType state) override;
 
 protected:
     lldb::PlatformSP m_platform_sp;

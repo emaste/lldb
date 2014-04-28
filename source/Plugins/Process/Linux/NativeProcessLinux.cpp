@@ -1104,6 +1104,7 @@ lldb_private::Error
 NativeProcessLinux::LaunchProcess (
     lldb_private::Module *exe_module,
     lldb_private::ProcessLaunchInfo &launch_info,
+    lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
     NativeProcessProtocolSP &native_process_sp)
 {
     Error error;
@@ -1148,6 +1149,13 @@ NativeProcessLinux::LaunchProcess (
             working_dir,
             error));
 
+    if (!native_process_sp->RegisterNativeDelegate (native_delegate))
+    {
+        // CONSIDER shut down the process monitor here?
+        error.SetErrorStringWithFormat ("failed to register the native delegate");
+        return error;
+    }
+
     // FIXME save this in constructor if we need it.
     // m_module = module;
 
@@ -1165,6 +1173,7 @@ NativeProcessLinux::LaunchProcess (
 lldb_private::Error
 NativeProcessLinux::DoAttachToProcessWithID (
     lldb::pid_t pid,
+    lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
     NativeProcessProtocolSP &native_process_sp)
 {
     Log *log (ProcessPOSIXLog::GetLogIfAllCategoriesSet (POSIX_LOG_PROCESS));
@@ -1186,6 +1195,13 @@ NativeProcessLinux::DoAttachToProcessWithID (
     native_process_sp.reset(new NativeProcessLinux (pid, error));
     if (!error.Success ())
         return error;
+
+    if (!native_process_sp->RegisterNativeDelegate (native_delegate))
+    {
+        // CONSIDER shut down the process monitor here?
+        error.SetErrorStringWithFormat ("failed to register the native delegate");
+        return error;
+    }
 
     // FIXME do we care about this?
     // Initialize the target module list

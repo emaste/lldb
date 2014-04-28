@@ -320,6 +320,7 @@ GDBRemoteCommunicationServer::LaunchDebugServerProcess ()
         assert (!m_debugged_process_sp && "lldb-gdbserver creating debugged process but one already exists");
         error = m_platform_sp->LaunchDebugProcess (
             m_process_launch_info,
+            *this,
             m_debugged_process_sp);
     }
 
@@ -381,6 +382,31 @@ GDBRemoteCommunicationServer::LaunchPlatformProcess ()
     }
 
     return error;
+}
+
+void
+GDBRemoteCommunicationServer::InitializeDelegate (lldb_private::NativeProcessProtocol *process)
+{
+    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
+    if (log)
+    {
+        log->Printf ("GDBRemoteCommunicationServer::%s called with NativeProcessProtocol 0x%" PRIu64,
+                __FUNCTION__,
+                reinterpret_cast<lldb::addr_t> (process));
+    }
+}
+
+void
+GDBRemoteCommunicationServer::ProcessStateChanged (lldb_private::NativeProcessProtocol *process, lldb::StateType state)
+{
+    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
+    if (log)
+    {
+        log->Printf ("GDBRemoteCommunicationServer::%s called with NativeProcessProtocol 0x%" PRIu64 ", state: %s",
+                __FUNCTION__,
+                reinterpret_cast<lldb::addr_t> (process),
+                StateAsCString (state));
+    }
 }
 
 GDBRemoteCommunication::PacketResult
@@ -855,6 +881,15 @@ GDBRemoteCommunicationServer::Handle_A (StringExtractorGDBRemote &packet)
         if (m_process_launch_info.GetProcessID() != LLDB_INVALID_PROCESS_ID)
         {
             return SendOKResponse ();
+        }
+        else
+        {
+            Log *log(GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
+            if (log)
+                log->Printf("GDBRemoteCommunicationServer::%s failed to launch exe: %s",
+                        __FUNCTION__,
+                        m_process_launch_error.AsCString());
+
         }
     }
     return SendErrorResponse (8);

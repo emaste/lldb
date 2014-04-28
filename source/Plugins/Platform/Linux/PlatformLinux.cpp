@@ -493,6 +493,7 @@ PlatformLinux::CalculateTrapHandlerSymbolNames ()
 Error
 PlatformLinux::LaunchDebugProcess (
     ProcessLaunchInfo &launch_info,
+    lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
     NativeProcessProtocolSP &process_sp)
 {
     if (!IsHost ())
@@ -517,6 +518,7 @@ PlatformLinux::LaunchDebugProcess (
     error = NativeProcessLinux::LaunchProcess (
         exe_module_sp.get (),
         launch_info,
+        native_delegate,
         process_sp);
 
     return error;

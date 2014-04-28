@@ -26,6 +26,10 @@
 #include "lldb/Interpreter/Options.h"
 #include "lldb/Host/Mutex.h"
 
+// TODO pull NativeDelegate class out of NativeProcessProtocol so we
+// can just forward ref the NativeDelegate rather than include it here.
+#include "../../../source/Host/common/NativeProcessProtocol.h"
+
 namespace lldb_private {
 
     //----------------------------------------------------------------------
@@ -881,6 +885,7 @@ namespace lldb_private {
         virtual Error
         LaunchDebugProcess (
             ProcessLaunchInfo &launch_info,
+            lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
             NativeProcessProtocolSP &process_sp);
 
     protected:

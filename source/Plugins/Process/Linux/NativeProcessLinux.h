@@ -85,11 +85,13 @@ namespace lldb_private
         LaunchProcess (
             Module *exe_module,
             ProcessLaunchInfo &launch_info,
+            lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
             NativeProcessProtocolSP &native_process_sp);
 
         static lldb_private::Error
         DoAttachToProcessWithID (
             lldb::pid_t pid,
+            lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
             NativeProcessProtocolSP &native_process_sp);
 
         // ---------------------------------------------------------------------
