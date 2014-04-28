@@ -1159,14 +1159,11 @@ NativeProcessLinux::LaunchProcess (
     // FIXME save this in constructor if we need it.
     // m_module = module;
 
-    if (!error.Success())
-        return error;
-
     // FIXME need this?
     // SetSTDIOFileDescriptor (m_monitor->GetTerminalFD());
 
-    // FIXME need this?
-    // SetID(m_monitor->GetPID());
+    launch_info.SetProcessID (native_process_sp->GetID ());
+
     return error;
 }
 
