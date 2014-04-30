@@ -1107,6 +1107,8 @@ NativeProcessLinux::LaunchProcess (
     lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
     NativeProcessProtocolSP &native_process_sp)
 {
+    Log *log (GetLogIfAllCategoriesSet (LIBLLDB_LOG_PROCESS));
+
     Error error;
 
     // Verify the working directory is valid if one was specified.
@@ -1148,6 +1150,13 @@ NativeProcessLinux::LaunchProcess (
             stderr_path,
             working_dir,
             error));
+
+    if (error.Fail ())
+    {
+        if (log)
+            log->Printf ("NativeProcessLinux::%s failed to launch process: %s", __FUNCTION__, error.AsCString ());
+        return error;
+    }
 
     if (!native_process_sp->RegisterNativeDelegate (native_delegate))
     {
@@ -1317,7 +1326,7 @@ WAIT_AGAIN:
     if (!IS_VALID_LLDB_HOST_THREAD(m_monitor_thread))
     {
         error.SetErrorToGenericError();
-        error.SetErrorString("Process launch failed.");
+        error.SetErrorString ("Process attach failed to create monitor thread for NativeProcessLinux::MonitorCallback.");
         return;
     }
 }
@@ -1371,7 +1380,7 @@ WAIT_AGAIN:
     if (!IS_VALID_LLDB_HOST_THREAD (m_monitor_thread))
     {
         error.SetErrorToGenericError ();
-        error.SetErrorString ("Process attach failed.");
+        error.SetErrorString ("Process attach failed to create monitor thread for NativeProcessLinux::MonitorCallback.");
         return;
     }
 }
@@ -1386,13 +1395,13 @@ NativeProcessLinux::~NativeProcessLinux()
 void
 NativeProcessLinux::StartLaunchOpThread(LaunchArgs *args, Error &error)
 {
-    static const char *g_thread_name = "lldb.process.linux.operation";
+    static const char *g_thread_name = "lldb.process.nativelinux.operation";
 
-    if (IS_VALID_LLDB_HOST_THREAD(m_operation_thread))
+    if (IS_VALID_LLDB_HOST_THREAD (m_operation_thread))
         return;
 
     m_operation_thread =
-        Host::ThreadCreate(g_thread_name, LaunchOpThread, args, &error);
+        Host::ThreadCreate (g_thread_name, LaunchOpThread, args, &error);
 }
 
 void *
@@ -1455,16 +1464,49 @@ NativeProcessLinux::Launch(LaunchArgs *args)
     // Child process.
     if (pid == 0)
     {
+        if (log)
+            log->Printf ("NativeProcessLinux::%s inferior process preparing to fork", __FUNCTION__);
+
         // Trace this process.
+        if (log)
+            log->Printf ("NativeProcessLinux::%s inferior process issuing PTRACE_TRACEME", __FUNCTION__);
+
         if (PTRACE(PTRACE_TRACEME, 0, NULL, NULL, 0) < 0)
+        {
+            if (log)
+                log->Printf ("NativeProcessLinux::%s inferior process PTRACE_TRACEME failed", __FUNCTION__);
             exit(ePtraceFailed);
+        }
 
         // Do not inherit setgid powers.
-        if (setgid(getgid()) != 0)
-            exit(eSetGidFailed);
+        if (log)
+            log->Printf ("NativeProcessLinux::%s inferior process resetting gid", __FUNCTION__);
 
-        // Let us have our own process group.
-        setpgid(0, 0);
+        if (setgid(getgid()) != 0)
+        {
+            if (log)
+                log->Printf ("NativeProcessLinux::%s inferior process setgid() failed", __FUNCTION__);
+            exit(eSetGidFailed);
+        }
+
+        // Attempt to have our own process group.
+        // TODO verify if we really want this.
+        if (log)
+            log->Printf ("NativeProcessLinux::%s inferior process resetting process group", __FUNCTION__);
+
+        if (setpgid(0, 0) != 0)
+        {
+            if (log)
+            {
+                const int error_code = errno;
+                log->Printf ("NativeProcessLinux::%s inferior setpgid() failed, errno=%d (%s), continuing with existing proccess group %" PRIu64,
+                        __FUNCTION__,
+                        error_code,
+                        strerror (error_code),
+                        static_cast<lldb::pid_t> (getpgid (0)));
+            }
+            // Don't allow this to prevent an inferior exec.
+        }
 
         // Dup file descriptors if needed.
         //
@@ -1494,12 +1536,20 @@ NativeProcessLinux::Launch(LaunchArgs *args)
         exit(eExecFailed);
     }
 
-    // Wait for the child process to to trap on its call to execve.
+    // Wait for the child process to trap on its call to execve.
     ::pid_t wpid;
     int status;
     if ((wpid = waitpid(pid, &status, 0)) < 0)
     {
         args->m_error.SetErrorToErrno();
+
+        if (log)
+            log->Printf ("NativeProcessLinux::%s waitpid for inferior failed with %s", __FUNCTION__, args->m_error.AsCString ());
+
+        // Mark the inferior as invalid.
+        // FIXME this could really use a new state - eStateLaunchFailure.  For now, using eStateInvalid.
+        monitor->SetState (StateType::eStateInvalid);
+
         goto FINISH;
     }
     else if (WIFEXITED(status))
@@ -1533,14 +1583,38 @@ NativeProcessLinux::Launch(LaunchArgs *args)
                 args->m_error.SetErrorString("Child returned unknown exit status.");
                 break;
         }
+
+        if (log)
+        {
+            log->Printf ("NativeProcessLinux::%s inferior exited with status %d before issuing a STOP",
+                    __FUNCTION__,
+                    WEXITSTATUS(status));
+        }
+
+        // Mark the inferior as invalid.
+        // FIXME this could really use a new state - eStateLaunchFailure.  For now, using eStateInvalid.
+        monitor->SetState (StateType::eStateInvalid);
+
         goto FINISH;
     }
     assert(WIFSTOPPED(status) && (wpid == static_cast<::pid_t> (pid)) &&
            "Could not sync with inferior process.");
 
+    if (log)
+        log->Printf ("NativeProcessLinux::%s inferior started, now in stopped state", __FUNCTION__);
+
     if (!SetDefaultPtraceOpts(pid))
     {
         args->m_error.SetErrorToErrno();
+        if (log)
+            log->Printf ("NativeProcessLinux::%s inferior failed to set default ptrace options: %s",
+                    __FUNCTION__,
+                    args->m_error.AsCString ());
+
+        // Mark the inferior as invalid.
+        // FIXME this could really use a new state - eStateLaunchFailure.  For now, using eStateInvalid.
+        monitor->SetState (StateType::eStateInvalid);
+
         goto FINISH;
     }
 
@@ -1553,7 +1627,18 @@ NativeProcessLinux::Launch(LaunchArgs *args)
     // implementation of ProcessLinux::GetSTDOUT to have a non-blocking
     // descriptor to read from).
     if (!EnsureFDFlags(monitor->m_terminal_fd, O_NONBLOCK, args->m_error))
+    {
+        if (log)
+            log->Printf ("NativeProcessLinux::%s inferior EnsureFDFlags failed for ensuring terminal O_NONBLOCK setting: %s",
+                    __FUNCTION__,
+                    args->m_error.AsCString ());
+
+        // Mark the inferior as invalid.
+        // FIXME this could really use a new state - eStateLaunchFailure.  For now, using eStateInvalid.
+        monitor->SetState (StateType::eStateInvalid);
+
         goto FINISH;
+    }
 
     if (log)
         log->Printf ("NativeProcessLinux::%s() adding pid = %" PRIu64, __FUNCTION__, pid);
@@ -1562,8 +1647,22 @@ NativeProcessLinux::Launch(LaunchArgs *args)
 
     // Let our process instance know the thread has stopped.
     listener.OnMessage (ProcessMessage::Trace(pid));
+    monitor->SetState (StateType::eStateStopped);
 
 FINISH:
+    if (log)
+    {
+        if (args->m_error.Success ())
+        {
+            log->Printf ("NativeProcessLinux::%s inferior launching succeeded", __FUNCTION__);
+        }
+        else
+        {
+            log->Printf ("NativeProcessLinux::%s inferior launching failed: %s",
+                __FUNCTION__,
+                args->m_error.AsCString ());
+        }
+    }
     return args->m_error.Success();
 }
 
