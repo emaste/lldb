@@ -12,6 +12,7 @@
 #include "lldb/lldb-enumerations.h"
 #include "lldb/Core/ArchSpec.h"
 #include "lldb/Core/Log.h"
+#include "lldb/Core/State.h"
 #include "lldb/Target/RegisterContextNativeThread.h"
 
 #include "NativeThreadProtocol.h"
@@ -241,9 +242,25 @@ NativeProcessProtocol::UnregisterNativeDelegate (NativeDelegate &native_delegate
 void
 NativeProcessProtocol::SynchronouslyNotifyProcessStateChanged (lldb::StateType state)
 {
+    Log *log (GetLogIfAllCategoriesSet (LIBLLDB_LOG_PROCESS));
+
     Mutex::Locker locker (m_delegates_mutex);
     for (auto native_delegate: m_delegates)
         native_delegate->ProcessStateChanged (this, state);
+
+    if (log)
+    {
+        if (!m_delegates.empty ())
+        {
+            log->Printf ("NativeProcessProtocol::%s: sent state notification [%s] from process %" PRIu64,
+                    __FUNCTION__, lldb_private::StateAsCString (state),  GetID ());
+        }
+        else
+        {
+            log->Printf ("NativeProcessProtocol::%s: would send state notification [%s] from process %" PRIu64 ", but no delegates",
+                    __FUNCTION__, lldb_private::StateAsCString (state),  GetID ());
+        }
+    }
 }
 
 Error

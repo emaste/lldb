@@ -293,7 +293,16 @@ protected:
 
     PacketResult
     Handle_QSetSTDERR (StringExtractorGDBRemote &packet);
-    
+
+    PacketResult
+    Handle_vCont (StringExtractorGDBRemote &packet);
+
+    PacketResult
+    Handle_vCont_actions (StringExtractorGDBRemote &packet);
+
+    PacketResult
+    Handle_stop_reason (StringExtractorGDBRemote &packet);
+
     PacketResult
     Handle_vFile_Open (StringExtractorGDBRemote &packet);
 

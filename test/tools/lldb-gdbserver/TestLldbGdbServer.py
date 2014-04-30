@@ -27,15 +27,17 @@ class LldbGdbServerTestCase(TestBase):
     def setUp(self):
         TestBase.setUp(self)
 
-        FORMAT = '%(asctime)-15s %(levelname)-8s %(message)s'
+        FORMAT = "%(asctime)-15s %(levelname)-8s %(message)s"
         logging.basicConfig(format=FORMAT)
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(self._LOGGING_LEVEL)
+        self.debug_monitor_extra_args = ""
 
     def init_llgs_test(self):
         self.debug_monitor_exe = get_lldb_gdbserver_exe()
         if not self.debug_monitor_exe:
             self.skipTest("lldb_gdbserver exe not found")
+        self.debug_monitor_extra_args = " -c 'log enable -f process-{}.log lldb process' -c 'log enable -f packets-{}.log gdb-remote packets'".format(self.id(), self.id(), self.id())
 
     def init_debugserver_test(self):
         self.debug_monitor_exe = get_debugserver_exe()
@@ -66,7 +68,10 @@ class LldbGdbServerTestCase(TestBase):
 
     def start_server(self):
         # start the server
-        server = pexpect.spawn("{} localhost:{}".format(self.debug_monitor_exe, self.port))
+        server = pexpect.spawn("{}{} localhost:{}".format(
+            self.debug_monitor_exe,
+            self.debug_monitor_extra_args,
+            self.port))
 
         # Turn on logging for what the child sends back.
         if self.TraceOn():
@@ -230,7 +235,8 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
+    # TODO get this working now.
+    # @unittest2.expectedFailure()
     def test_inferior_exit_0_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()

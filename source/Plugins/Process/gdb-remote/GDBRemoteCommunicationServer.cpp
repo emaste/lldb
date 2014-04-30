@@ -22,6 +22,7 @@
 #include "lldb/Core/Log.h"
 #include "lldb/Core/State.h"
 #include "lldb/Core/StreamString.h"
+#include "lldb/Host/Debug.h"
 #include "lldb/Host/Endian.h"
 #include "lldb/Host/File.h"
 #include "lldb/Host/Host.h"
@@ -36,6 +37,21 @@
 
 using namespace lldb;
 using namespace lldb_private;
+
+//----------------------------------------------------------------------
+// GDBRemote Errors
+//----------------------------------------------------------------------
+
+namespace
+{
+    enum GDBRemoteServerError
+    {
+        // Set to the first unused error number in literal form below
+        eErrorFirst = 29,
+        eErrorNoProcess = eErrorFirst,
+        eErrorResume
+    };
+}
 
 //----------------------------------------------------------------------
 // GDBRemoteCommunicationServer constructor
@@ -220,6 +236,18 @@ GDBRemoteCommunicationServer::GetPacketAndSendResponse (uint32_t timeout_usec,
             packet_result = Handle_qPlatform_shell (packet);
             break;
 
+        case StringExtractorGDBRemote::eServerPacketType_vCont:
+            packet_result = Handle_vCont (packet);
+            break;
+
+        case StringExtractorGDBRemote::eServerPacketType_vCont_actions:
+            packet_result = Handle_vCont_actions (packet);
+            break;
+
+        // case StringExtractorGDBRemote::eServerPacketType_stop_reason: // ?
+        //     packet_result = Handle_stop_reason (packet);
+        //     break;
+
         case StringExtractorGDBRemote::eServerPacketType_vFile_open:
             packet_result = Handle_vFile_Open (packet);
             break;
@@ -387,25 +415,60 @@ GDBRemoteCommunicationServer::LaunchPlatformProcess ()
 void
 GDBRemoteCommunicationServer::InitializeDelegate (lldb_private::NativeProcessProtocol *process)
 {
+    assert (process && "process cannot be NULL");
     Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
     if (log)
     {
-        log->Printf ("GDBRemoteCommunicationServer::%s called with NativeProcessProtocol 0x%" PRIu64,
+        log->Printf ("GDBRemoteCommunicationServer::%s called with NativeProcessProtocol pid %" PRIu64 ", current state: %s",
                 __FUNCTION__,
-                reinterpret_cast<lldb::addr_t> (process));
+                process->GetID (),
+                StateAsCString (process->GetState ()));
     }
 }
 
 void
 GDBRemoteCommunicationServer::ProcessStateChanged (lldb_private::NativeProcessProtocol *process, lldb::StateType state)
 {
+    assert (process && "process cannot be NULL");
     Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
     if (log)
     {
-        log->Printf ("GDBRemoteCommunicationServer::%s called with NativeProcessProtocol 0x%" PRIu64 ", state: %s",
+        log->Printf ("GDBRemoteCommunicationServer::%s called with NativeProcessProtocol pid %" PRIu64 ", state: %s",
                 __FUNCTION__,
-                reinterpret_cast<lldb::addr_t> (process),
+                process->GetID (),
                 StateAsCString (state));
+    }
+
+    PacketResult result = PacketResult::Success;
+
+    switch (state)
+    {
+    case StateType::eStateExited:
+        // send W notification
+        // FIXME get inferior exit code
+        result = SendPacketNoLock ("W00", 3);
+        break;
+
+    default:
+        if (log)
+        {
+            log->Printf ("GDBRemoteCommunicationServer::%s didn't pass along state change info for pid %" PRIu64 ", state: %s",
+                    __FUNCTION__,
+                    process->GetID (),
+                    StateAsCString (state));
+        }
+        break;
+    }
+
+    if (result != PacketResult::Success)
+    {
+        if (log)
+        {
+            log->Printf ("GDBRemoteCommunicationServer::%s failed to send stop notification for PID %" PRIu64 ", state: %s",
+                    __FUNCTION__,
+                    process->GetID (),
+                    StateAsCString (state));
+        }
     }
 }
 
@@ -1320,6 +1383,68 @@ GDBRemoteCommunicationServer::Handle_QSetSTDERR (StringExtractorGDBRemote &packe
         return SendOKResponse ();
     }
     return SendErrorResponse (17);
+}
+
+GDBRemoteCommunication::PacketResult
+GDBRemoteCommunicationServer::Handle_vCont_actions (StringExtractorGDBRemote &packet)
+{
+    if (!IsGdbServer ())
+    {
+        // only llgs supports $vCont.
+        return SendUnimplementedResponse (packet.GetStringRef().c_str());
+    }
+
+    // We handle $vCont messages for c.
+    // TODO add C, s and S.
+    StreamString response;
+    response.Printf("vCont;c");
+
+    return SendPacketNoLock(response.GetData(), response.GetSize());
+}
+
+GDBRemoteCommunication::PacketResult
+GDBRemoteCommunicationServer::Handle_vCont (StringExtractorGDBRemote &packet)
+{
+    if (!IsGdbServer ())
+    {
+        // only llgs supports $vCont
+        return SendUnimplementedResponse (packet.GetStringRef().c_str());
+    }
+
+    packet.SetFilePos (::strlen ("vCont"));
+
+    // For now just support all continue.
+    const bool is_all_continue = !packet.GetBytesLeft () || (::strcmp (packet.Peek (), ";c") == 0);
+    if (!is_all_continue)
+        return SendUnimplementedResponse (packet.GetStringRef().c_str());
+
+    // Ensure we have a native process.
+    if (!m_debugged_process_sp)
+        return SendErrorResponse (GDBRemoteServerError::eErrorNoProcess);
+
+    // Build the ResumeActionList
+    lldb_private::ResumeActionList actions (StateType::eStateRunning, 0);
+
+    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
+
+    Error error = m_debugged_process_sp->Resume (actions);
+    if (error.Fail ())
+    {
+        if (log)
+        {
+            log->Printf ("GDBRemoteCommunicationServer::%s vCont failed for process %" PRIu64 ": %s",
+                    __FUNCTION__,
+                    m_debugged_process_sp->GetID (),
+                    error.AsCString ());
+        }
+        return SendErrorResponse (GDBRemoteServerError::eErrorResume);
+    }
+
+    if (log)
+        log->Printf ("GDBRemoteCommunicationServer::%s continued process %" PRIu64, __FUNCTION__, m_debugged_process_sp->GetID ());
+
+    // No response required from continue.
+    return PacketResult::Success;
 }
 
 GDBRemoteCommunication::PacketResult
