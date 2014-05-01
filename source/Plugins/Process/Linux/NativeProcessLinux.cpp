@@ -1140,8 +1140,9 @@ NativeProcessLinux::LaunchProcess (
     stderr_path = GetFilePath (file_action, stderr_path);
 
     // Create the NativeProcessLinux in launch mode.
-    native_process_sp.reset (
-        new NativeProcessLinux (
+    native_process_sp.reset (new NativeProcessLinux ());
+
+    reinterpret_cast<NativeProcessLinux*> (native_process_sp.get ())->LaunchInferior (
             exe_module,
             launch_info.GetArguments ().GetConstArgumentVector (),
             launch_info.GetEnvironmentEntries ().GetConstArgumentVector (),
@@ -1149,10 +1150,11 @@ NativeProcessLinux::LaunchProcess (
             stdout_path,
             stderr_path,
             working_dir,
-            error));
+            error);
 
     if (error.Fail ())
     {
+        native_process_sp.reset ();
         if (log)
             log->Printf ("NativeProcessLinux::%s failed to launch process: %s", __FUNCTION__, error.AsCString ());
         return error;
@@ -1160,6 +1162,7 @@ NativeProcessLinux::LaunchProcess (
 
     if (!native_process_sp->RegisterNativeDelegate (native_delegate))
     {
+        native_process_sp.reset ();
         // CONSIDER shut down the process monitor here?
         error.SetErrorStringWithFormat ("failed to register the native delegate");
         return error;
@@ -1198,13 +1201,17 @@ NativeProcessLinux::DoAttachToProcessWithID (
     if (!error.Success ())
         return error;
 
-    native_process_sp.reset(new NativeProcessLinux (pid, error));
+    native_process_sp.reset (new NativeProcessLinux ());
+    reinterpret_cast<NativeProcessLinux*> (native_process_sp.get ())->AttachToInferior (pid, error);
     if (!error.Success ())
+    {
+        native_process_sp.reset ();
         return error;
+    }
 
     if (!native_process_sp->RegisterNativeDelegate (native_delegate))
     {
-        // CONSIDER shut down the process monitor here?
+        native_process_sp.reset (new NativeProcessLinux ());
         error.SetErrorStringWithFormat ("failed to register the native delegate");
         return error;
     }
@@ -1255,6 +1262,20 @@ NativeProcessLinux::GetFilePath (
 // Public Instance Methods
 // -----------------------------------------------------------------------------
 
+NativeProcessLinux::NativeProcessLinux () :
+    NativeProcessProtocol (LLDB_INVALID_PROCESS_ID),
+    m_listener (&(GetSharedLoggingListener ())),
+    m_arch (),
+    m_operation_thread (LLDB_INVALID_HOST_THREAD),
+    m_monitor_thread (LLDB_INVALID_HOST_THREAD),
+    m_terminal_fd (-1),
+    m_operation (nullptr),
+    m_operation_mutex (),
+    m_operation_pending (),
+    m_operation_done ()
+{
+}
+
 //------------------------------------------------------------------------------
 /// The basic design of the NativeProcessLinux is built around two threads.
 ///
@@ -1267,7 +1288,8 @@ NativeProcessLinux::GetFilePath (
 /// launching or attaching to the inferior process, and then 2) servicing
 /// operations such as register reads/writes, stepping, etc.  See the comments
 /// on the Operation class for more info as to why this is needed.
-NativeProcessLinux::NativeProcessLinux (
+void
+NativeProcessLinux::LaunchInferior (
     Module *module,
     const char *argv[],
     const char *envp[],
@@ -1275,15 +1297,11 @@ NativeProcessLinux::NativeProcessLinux (
     const char *stdout_path,
     const char *stderr_path,
     const char *working_dir,
-    lldb_private::Error &error) :
-    NativeProcessProtocol (LLDB_INVALID_PROCESS_ID),
-    m_listener (&(GetSharedLoggingListener ())),
-    m_arch (module ? module->GetArchitecture () : ArchSpec ()),
-    m_operation_thread (LLDB_INVALID_HOST_THREAD),
-    m_monitor_thread (LLDB_INVALID_HOST_THREAD),
-    m_terminal_fd (-1),
-    m_operation (nullptr)
+    lldb_private::Error &error)
 {
+    if (module)
+        m_arch = module->GetArchitecture ();
+
     SetState(eStateLaunching);
 
     std::unique_ptr<LaunchArgs> args(
@@ -1331,17 +1349,10 @@ WAIT_AGAIN:
     }
 }
 
-NativeProcessLinux::NativeProcessLinux (
-    lldb::pid_t pid,
-    lldb_private::Error &error) :
-    NativeProcessProtocol (pid),
-    m_listener(&(GetSharedLoggingListener ())),
-    m_arch (),
-    m_operation_thread (LLDB_INVALID_HOST_THREAD),
-    m_monitor_thread (LLDB_INVALID_HOST_THREAD),
-    m_terminal_fd (-1),
-    m_operation (nullptr)
+void
+NativeProcessLinux::AttachToInferior (lldb::pid_t pid, lldb_private::Error &error)
 {
+    m_pid = pid;
     SetState(eStateAttaching);
 
     sem_init (&m_operation_pending, 0, 0);
@@ -1435,6 +1446,7 @@ NativeProcessLinux::Launch(LaunchArgs *args)
     const size_t err_len = 1024;
     char err_str[err_len];
     lldb::pid_t pid;
+    NativeThreadProtocolSP thread_sp;
 
     lldb::ThreadSP inferior;
     Log *log (GetLogIfAllCategoriesSet (LIBLLDB_LOG_PROCESS));
@@ -1644,6 +1656,9 @@ NativeProcessLinux::Launch(LaunchArgs *args)
         log->Printf ("NativeProcessLinux::%s() adding pid = %" PRIu64, __FUNCTION__, pid);
 
     listener.OnNewThread (pid);
+    thread_sp = monitor->AddThread (static_cast<lldb::tid_t> (pid));
+    assert (thread_sp && "AddThread() returned a nullptr thread");
+    reinterpret_cast<NativeThreadLinux*> (thread_sp.get ())->SetStopped ();
 
     // Let our process instance know the thread has stopped.
     listener.OnMessage (ProcessMessage::Trace(pid));
@@ -2120,6 +2135,10 @@ NativeProcessLinux::WaitForInitialTIDStop(lldb::tid_t tid)
 Error
 NativeProcessLinux::Resume (const ResumeActionList &resume_actions)
 {
+    Log *log (GetLogIfAllCategoriesSet (LIBLLDB_LOG_PROCESS));
+    if (log)
+        log->Printf ("NativeProcessLinux::%s called: pid %" PRIu64, __FUNCTION__, GetID ());
+
     Mutex::Locker locker (m_threads_mutex);
     for (auto thread_sp : m_threads)
     {
@@ -2128,6 +2147,12 @@ NativeProcessLinux::Resume (const ResumeActionList &resume_actions)
 
         const ResumeAction *const action = resume_actions.GetActionForThread (thread_sp->GetID (), true);
         assert (action && "NULL ResumeAction returned for thread during Resume ()");
+
+        if (log)
+        {
+            log->Printf ("NativeProcessLinux::%s processing resume action state %s for pid %" PRIu64 " tid %" PRIu64, 
+                    __FUNCTION__, StateAsCString (action->state), GetID (), thread_sp->GetID ());
+        }
 
         switch (action->state)
         {
@@ -2844,7 +2869,7 @@ NativeProcessLinux::ReadThreadPointer(lldb::tid_t tid, lldb::addr_t &value)
 }
 
 bool
-NativeProcessLinux::Resume(lldb::tid_t tid, uint32_t signo)
+NativeProcessLinux::Resume (lldb::tid_t tid, uint32_t signo)
 {
     bool result;
     Log *log (GetLogIfAllCategoriesSet (LIBLLDB_LOG_PROCESS));
@@ -2852,8 +2877,8 @@ NativeProcessLinux::Resume(lldb::tid_t tid, uint32_t signo)
     if (log)
         log->Printf ("NativeProcessLinux::%s() resuming thread = %"  PRIu64 " with signal %s", __FUNCTION__, tid,
                                  GetUnixSignals().GetSignalAsCString (signo));
-    ResumeOperation op(tid, signo, result);
-    DoOperation(&op);
+    ResumeOperation op (tid, signo, result);
+    DoOperation (&op);
     if (log)
         log->Printf ("NativeProcessLinux::%s() resuming result = %s", __FUNCTION__, result ? "true" : "false");
     return result;
@@ -2957,4 +2982,44 @@ NativeProcessLinux::StopOpThread()
     Host::ThreadCancel(m_operation_thread, NULL);
     Host::ThreadJoin(m_operation_thread, &result, NULL);
     m_operation_thread = LLDB_INVALID_HOST_THREAD;
+}
+
+bool
+NativeProcessLinux::HasThreadNoLock (lldb::tid_t thread_id)
+{
+    for (auto thread_sp : m_threads)
+    {
+        assert (thread_sp && "thread list should not contain NULL threads");
+        if (thread_sp->GetID () == thread_id)
+        {
+            // We have this thread.
+            return true;
+        }
+    }
+
+    // We don't have this thread.
+    return false;
+}
+
+NativeThreadProtocolSP
+NativeProcessLinux::AddThread (lldb::tid_t thread_id)
+{
+    Log *log (GetLogIfAllCategoriesSet (LIBLLDB_LOG_THREAD));
+
+    Mutex::Locker locker (m_threads_mutex);
+
+    if (log)
+    {
+        log->Printf ("NativeProcessLinux::%s pid %" PRIu64 " adding thread with tid %" PRIu64,
+                __FUNCTION__,
+                GetID (),
+                thread_id);
+    }
+
+    assert (!HasThreadNoLock (thread_id) && "attempted to add a thread by id that already exists");
+
+    NativeThreadProtocolSP thread_sp (new NativeThreadLinux (this, thread_id));
+    m_threads.push_back (thread_sp);
+
+    return thread_sp;
 }

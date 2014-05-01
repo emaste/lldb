@@ -1411,21 +1411,31 @@ GDBRemoteCommunicationServer::Handle_vCont (StringExtractorGDBRemote &packet)
         return SendUnimplementedResponse (packet.GetStringRef().c_str());
     }
 
+    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
+    if (log)
+        log->Printf ("GDBRemoteCommunicationServer::%s handling vCont packet", __FUNCTION__);
+
     packet.SetFilePos (::strlen ("vCont"));
 
     // For now just support all continue.
     const bool is_all_continue = !packet.GetBytesLeft () || (::strcmp (packet.Peek (), ";c") == 0);
     if (!is_all_continue)
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s not implemented for %s variant", __FUNCTION__, packet.GetStringRef ().c_str ());
         return SendUnimplementedResponse (packet.GetStringRef().c_str());
+    }
 
     // Ensure we have a native process.
     if (!m_debugged_process_sp)
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s no debugged process shared pointer", __FUNCTION__);
         return SendErrorResponse (GDBRemoteServerError::eErrorNoProcess);
+    }
 
     // Build the ResumeActionList
     lldb_private::ResumeActionList actions (StateType::eStateRunning, 0);
-
-    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
 
     Error error = m_debugged_process_sp->Resume (actions);
     if (error.Fail ())

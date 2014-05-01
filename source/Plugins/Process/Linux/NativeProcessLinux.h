@@ -98,23 +98,7 @@ namespace lldb_private
         // Public Instance Methods
         // ---------------------------------------------------------------------
 
-        /// Launches an inferior process ready for debugging.  Forms the
-        /// implementation of Process::DoLaunch.
-        NativeProcessLinux(
-            Module *module,
-            char const *argv[],
-            char const *envp[],
-            const char *stdin_path,
-            const char *stdout_path,
-            const char *stderr_path,
-            const char *working_dir,
-            Error &error);
-
-        NativeProcessLinux(
-            lldb::pid_t pid,
-            Error &error);
-
-        ~NativeProcessLinux();
+        ~NativeProcessLinux() override;
 
         enum ResumeSignals
         {
@@ -344,6 +328,24 @@ namespace lldb_private
         // ---------------------------------------------------------------------
         // Private Instance Methods
         // ---------------------------------------------------------------------
+        NativeProcessLinux ();
+
+        /// Launches an inferior process ready for debugging.  Forms the
+        /// implementation of Process::DoLaunch.
+        void
+        LaunchInferior (
+            Module *module,
+            char const *argv[],
+            char const *envp[],
+            const char *stdin_path,
+            const char *stdout_path,
+            const char *stderr_path,
+            const char *working_dir,
+            Error &error);
+
+        void
+        AttachToInferior (lldb::pid_t pid, Error &error);
+
         void
         StartLaunchOpThread(LaunchArgs *args, lldb_private::Error &error);
 
@@ -419,6 +421,12 @@ namespace lldb_private
         /// Stops monitoring the child process thread.
         void
         StopMonitor();
+
+        bool
+        HasThreadNoLock (lldb::tid_t thread_id);
+
+        NativeThreadProtocolSP
+        AddThread (lldb::tid_t thread_id);
     };
 
 } // End lldb_private namespace.

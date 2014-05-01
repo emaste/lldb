@@ -36,6 +36,15 @@ namespace lldb_private
         bool
         GetStopReason (ThreadStopInfo &stop_info) override;
 
+        lldb::RegisterContextNativeThreadSP
+        GetRegisterContext () override;
+
+        Error
+        SetWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags, bool hardware) override;
+
+        Error
+        RemoveWatchpoint (lldb::addr_t addr) override;
+
     private:
         // ---------------------------------------------------------------------
         // Interface for friend classes

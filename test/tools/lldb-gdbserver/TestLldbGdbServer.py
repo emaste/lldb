@@ -21,8 +21,8 @@ class LldbGdbServerTestCase(TestBase):
 
     _GDBREMOTE_KILL_PACKET = "$k#6b"
 
-    # _LOGGING_LEVEL = logging.WARNING
-    _LOGGING_LEVEL = logging.DEBUG
+    _LOGGING_LEVEL = logging.WARNING
+    # _LOGGING_LEVEL = logging.DEBUG
 
     def setUp(self):
         TestBase.setUp(self)
@@ -33,11 +33,16 @@ class LldbGdbServerTestCase(TestBase):
         self.logger.setLevel(self._LOGGING_LEVEL)
         self.debug_monitor_extra_args = ""
 
+        # temporary filtering
+        # run_regex = re.compile(r'test_inferior_exit_0_llgs_dwarf')
+        # if not run_regex.search(self.id()):
+        #     self.skipTest("Didn't match run regex")
+
     def init_llgs_test(self):
         self.debug_monitor_exe = get_lldb_gdbserver_exe()
         if not self.debug_monitor_exe:
             self.skipTest("lldb_gdbserver exe not found")
-        self.debug_monitor_extra_args = " -c 'log enable -f process-{}.log lldb process' -c 'log enable -f packets-{}.log gdb-remote packets'".format(self.id(), self.id(), self.id())
+        self.debug_monitor_extra_args = " -c 'log enable -f process-{}.log lldb process thread' -c 'log enable -f packets-{}.log gdb-remote packets'".format(self.id(), self.id(), self.id())
 
     def init_debugserver_test(self):
         self.debug_monitor_exe = get_debugserver_exe()

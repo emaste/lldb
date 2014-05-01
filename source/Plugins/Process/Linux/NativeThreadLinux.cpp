@@ -49,6 +49,27 @@ NativeThreadLinux::GetStopReason (ThreadStopInfo &stop_info)
     return false;
 }
 
+lldb::RegisterContextNativeThreadSP
+NativeThreadLinux::GetRegisterContext ()
+{
+    // TODO implement
+    return RegisterContextNativeThreadSP ();
+}
+
+Error
+NativeThreadLinux::SetWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags, bool hardware)
+{
+    // TODO implement
+    return Error ("not implemented");
+}
+
+Error
+NativeThreadLinux::RemoveWatchpoint (lldb::addr_t addr)
+{
+    // TODO implement
+    return Error ("not implemented");
+}
+
 void
 NativeThreadLinux::SetRunning ()
 {
