@@ -73,29 +73,41 @@ NativeThreadLinux::RemoveWatchpoint (lldb::addr_t addr)
 void
 NativeThreadLinux::SetRunning ()
 {
-    MaybeLogStateChange (StateType::eStateRunning);
-    m_state = StateType::eStateRunning;
+    const StateType new_state = StateType::eStateRunning;
+    MaybeLogStateChange (new_state);
+    m_state = new_state;
 }
 
 void
 NativeThreadLinux::SetStepping ()
 {
-    MaybeLogStateChange (StateType::eStateRunning);
-    m_state = StateType::eStateStepping;
+    const StateType new_state = StateType::eStateStepping;
+    MaybeLogStateChange (new_state);
+    m_state = new_state;
 }
 
 void
 NativeThreadLinux::SetStopped ()
 {
-    MaybeLogStateChange (StateType::eStateRunning);
-    m_state = StateType::eStateStopped;
+    const StateType new_state = StateType::eStateStopped;
+    MaybeLogStateChange (new_state);
+    m_state = new_state;
 }
 
 void
 NativeThreadLinux::SetSuspended ()
 {
-    MaybeLogStateChange (StateType::eStateRunning);
-    m_state = StateType::eStateSuspended;
+    const StateType new_state = StateType::eStateSuspended;
+    MaybeLogStateChange (new_state);
+    m_state = new_state;
+}
+
+void
+NativeThreadLinux::SetExited ()
+{
+    const StateType new_state = StateType::eStateExited;
+    MaybeLogStateChange (new_state);
+    m_state = new_state;
 }
 
 void

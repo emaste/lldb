@@ -38,6 +38,53 @@ NativeProcessProtocol::NativeProcessProtocol (lldb::pid_t pid) :
 {
 }
 
+bool
+NativeProcessProtocol::GetExitStatus (int *status, std::string &exit_description)
+{
+    if (m_state == lldb::eStateExited)
+    {
+        *status = m_exit_status;
+        exit_description = m_exit_description;
+        return true;
+    }
+
+    *status = 0;
+    return false;
+}
+
+bool
+NativeProcessProtocol::SetExitStatus (int status, const char *exit_description, bool bNotifyStateChange)
+{
+    Log *log (lldb_private::GetLogIfAllCategoriesSet (LIBLLDB_LOG_PROCESS));
+    if (log)
+        log->Printf ("NativeProcessProtocol::%s(%d, %s, %s) called",
+                __FUNCTION__,
+                status,
+                exit_description ? exit_description : "nullptr",
+                bNotifyStateChange ? "true" : "false");
+
+    // Exit status already set
+    if (m_state == lldb::eStateExited)
+    {
+        if (log)
+            log->Printf ("NativeProcessProtocol::%s exit status already set to %d, ignoring new set to %d", __FUNCTION__, m_exit_status, status);
+        return false;
+    }
+
+    m_state = lldb::eStateExited;
+
+    m_exit_status = status;
+    if (exit_description && exit_description[0])
+        m_exit_description = exit_description;
+    else
+        m_exit_description.clear();
+
+    if (bNotifyStateChange)
+        SynchronouslyNotifyProcessStateChanged (lldb::eStateExited);
+
+    return true;
+}
+
 NativeThreadProtocolSP
 NativeProcessProtocol::GetThreadAtIndex (uint32_t idx)
 {

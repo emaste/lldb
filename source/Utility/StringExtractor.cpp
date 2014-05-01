@@ -423,13 +423,21 @@ StringExtractor::GetHexByteStringTerminatedBy (std::string &str,
                                                char terminator)
 {
     str.clear();
+#if 0
     char ch;
+    // I think this is totally wrong from what I would expect.
     while ((ch = GetHexU8(0,false)) != '\0')
         str.append(1, ch);
     if (Peek() && *Peek() == terminator)
         return str.size();
+
     str.clear();
     return str.size();
+#else
+    for (const char *pch = Peek(); pch && *pch && (*pch != terminator); str.append(1, GetHexU8(0, false)), pch = Peek ())
+    {}
+    return str.size();
+#endif
 }
 
 bool

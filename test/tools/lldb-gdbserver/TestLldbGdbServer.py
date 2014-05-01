@@ -34,7 +34,7 @@ class LldbGdbServerTestCase(TestBase):
         self.debug_monitor_extra_args = ""
 
         # temporary filtering
-        # run_regex = re.compile(r'test_inferior_exit_0_llgs_dwarf')
+        # run_regex = re.compile(r'test_inferior_exit_42_llgs_dwarf')
         # if not run_regex.search(self.id()):
         #     self.skipTest("Didn't match run regex")
 
@@ -240,8 +240,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    # TODO get this working now.
-    # @unittest2.expectedFailure()
     def test_inferior_exit_0_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()
@@ -277,7 +275,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_inferior_exit_42_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()

@@ -49,7 +49,8 @@ namespace
         // Set to the first unused error number in literal form below
         eErrorFirst = 29,
         eErrorNoProcess = eErrorFirst,
-        eErrorResume
+        eErrorResume,
+        eErrorExitStatus
     };
 }
 
@@ -426,6 +427,40 @@ GDBRemoteCommunicationServer::InitializeDelegate (lldb_private::NativeProcessPro
     }
 }
 
+GDBRemoteCommunication::PacketResult
+GDBRemoteCommunicationServer::SendWResponse (lldb_private::NativeProcessProtocol *process)
+{
+    assert (process && "process cannot be NULL");
+    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
+
+    // send W notification
+    int exit_status = 0;
+    std::string exit_description;
+
+    const bool got_exit_info = process->GetExitStatus (&exit_status, exit_description);
+    if (!got_exit_info)
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s pid %" PRIu64 ", failed to retrieve process exit status", __FUNCTION__, process->GetID ());
+
+        StreamGDBRemote response;
+        response.PutChar ('E');
+        response.PutHex8 (GDBRemoteServerError::eErrorExitStatus);
+        return SendPacketNoLock(response.GetData(), response.GetSize());
+    }
+    else
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s pid %" PRIu64 ", returning exit status %d [%s]", __FUNCTION__, process->GetID (), exit_status, exit_description.c_str ());
+
+        StreamGDBRemote response;
+        response.PutChar ('W');
+        // POSIX exit status limited to unsigned 8 bits.
+        response.PutHex8 (exit_status);
+        return SendPacketNoLock(response.GetData(), response.GetSize());
+    }
+}
+
 void
 GDBRemoteCommunicationServer::ProcessStateChanged (lldb_private::NativeProcessProtocol *process, lldb::StateType state)
 {
@@ -444,9 +479,7 @@ GDBRemoteCommunicationServer::ProcessStateChanged (lldb_private::NativeProcessPr
     switch (state)
     {
     case StateType::eStateExited:
-        // send W notification
-        // FIXME get inferior exit code
-        result = SendPacketNoLock ("W00", 3);
+        result = SendWResponse (process);
         break;
 
     default:
@@ -878,6 +911,9 @@ GDBRemoteCommunicationServer::Handle_A (StringExtractorGDBRemote &packet)
     // separated hex encoded argument value list, but we will stay true to the
     // documented version of the 'A' packet here...
 
+    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
+    int actual_arg_index = 0;
+
     packet.SetFilePos(1); // Skip the 'A'
     bool success = true;
     while (success && packet.GetBytesLeft() > 0)
@@ -910,7 +946,7 @@ GDBRemoteCommunicationServer::Handle_A (StringExtractorGDBRemote &packet)
                         // back into a UTF8 string and make sure the length
                         // matches the one supplied in the packet
                         std::string arg;
-                        if (packet.GetHexByteString(arg) != (arg_len / 2))
+                        if (packet.GetHexByteStringTerminatedBy(arg, ',') != (arg_len / 2))
                             success = false;
                         else
                         {
@@ -926,6 +962,9 @@ GDBRemoteCommunicationServer::Handle_A (StringExtractorGDBRemote &packet)
                                 if (arg_idx == 0)
                                     m_process_launch_info.GetExecutableFile().SetFile(arg.c_str(), false);
                                 m_process_launch_info.GetArguments().AppendArgument(arg.c_str());
+                                if (log)
+                                    log->Printf ("GDBRemoteCommunicationServer::%s added arg %d: \"%s\"", __FUNCTION__, actual_arg_index, arg.c_str ());
+                                ++actual_arg_index;
                             }
                         }
                     }
@@ -936,10 +975,6 @@ GDBRemoteCommunicationServer::Handle_A (StringExtractorGDBRemote &packet)
 
     if (success)
     {
-        // FIXME: remove linux restriction once eLaunchFlagDebug is supported
-#if !defined (__linux__)
-        m_process_launch_info.GetFlags().Set (eLaunchFlagDebug);
-#endif
         m_process_launch_error = LaunchProcess ();
         if (m_process_launch_info.GetProcessID() != LLDB_INVALID_PROCESS_ID)
         {

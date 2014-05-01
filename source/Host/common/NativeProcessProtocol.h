@@ -169,30 +169,10 @@ namespace lldb_private
         // Exit Status
         //----------------------------------------------------------------------
         virtual bool
-        GetExitStatus (int *status)
-        {
-            if (m_state == lldb::eStateExited)
-            {
-                *status = m_exit_status;
-                return true;
-            }
-            *status = 0;
-            return false;
-        }
+        GetExitStatus (int *status, std::string &exit_description);
+
         virtual bool
-        SetExitStatus (int status, const char *exit_description)
-        {
-            // Exit status already set
-            if (m_state == lldb::eStateExited)
-                return false;
-            m_state = lldb::eStateExited;
-            m_exit_status = status;
-            if (exit_description && exit_description[0])
-                m_exit_description = exit_description;
-            else
-                m_exit_description.clear();
-            return true;
-        }
+        SetExitStatus (int status, const char *exit_description, bool bNotifyStateChange);
 
         //----------------------------------------------------------------------
         // Access to threads

@@ -1142,6 +1142,16 @@ NativeProcessLinux::LaunchProcess (
     // Create the NativeProcessLinux in launch mode.
     native_process_sp.reset (new NativeProcessLinux ());
 
+    if (log)
+    {
+        int i = 0;
+        for (const char **args = launch_info.GetArguments ().GetConstArgumentVector (); *args; ++args, ++i)
+        {
+            log->Printf ("NativeProcessLinux::%s arg %d: \"%s\"", __FUNCTION__, i, *args ? *args : "nullptr");
+            ++i;
+        }
+    }
+
     reinterpret_cast<NativeProcessLinux*> (native_process_sp.get ())->LaunchInferior (
             exe_module,
             launch_info.GetArguments ().GetConstArgumentVector (),
@@ -1839,8 +1849,9 @@ NativeProcessLinux::MonitorCallback(void *callback_baton,
     bool stop_monitoring;
     siginfo_t info;
     int ptrace_err;
-
     Log *log (GetLogIfAnyCategoriesSet (LIBLLDB_LOG_PROCESS));
+
+    assert (monitor && "monitor is null");
 
     if (exited)
     {
@@ -1848,6 +1859,7 @@ NativeProcessLinux::MonitorCallback(void *callback_baton,
             log->Printf ("NativeProcessLinux::%s() got exit signal, tid = %"  PRIu64, __FUNCTION__, pid);
         message = ProcessMessage::Exit(pid, status);
         listener.OnMessage (message);
+        monitor->SetExitStatus (status, nullptr, true);
         return pid == monitor->GetID ();
     }
 
@@ -1871,10 +1883,9 @@ NativeProcessLinux::MonitorCallback(void *callback_baton,
             // If we are going to stop monitoring, we need to notify our process object
             if (stop_monitoring)
             {
-                // FIXME store the exit code (status)
                 message = ProcessMessage::Exit(pid, status);
                 listener.OnMessage (message);
-                monitor->SetState (StateType::eStateExited);
+                monitor->SetExitStatus (status, nullptr, true);
             }
         }
     }
@@ -1946,11 +1957,36 @@ NativeProcessLinux::MonitorSIGTRAP(NativeProcessLinux *monitor,
         unsigned long data = 0;
         if (!monitor->GetEventMessage(pid, &data))
             data = -1;
+
+        const bool is_main_thread = (pid == monitor->GetID ());
         if (log)
-            log->Printf ("NativeProcessLinux::%s() received limbo event, data = %lx, pid = %" PRIu64, __FUNCTION__, data, pid);
+        {
+            log->Printf ("NativeProcessLinux::%s() received PTRACE_EVENT_EXIT, data = %lx, pid = %" PRIu64 " (%s)", 
+                    __FUNCTION__, data, pid,
+                    is_main_thread ? "is main thread" : "not main thread");
+        }
+
+        // Set the thread to exited.
+        NativeThreadProtocolSP thread_sp = monitor->GetThreadByID (pid);
+        if (!thread_sp)
+        {
+            if (log)
+            {
+                log->Printf ("NativeProcessLinux::%s() pid %" PRIu64 " failed to retrieve thread for tid %" PRIu64", cannot set thread state",
+                        __FUNCTION__,
+                        monitor->GetID (),
+                        pid);
+            }
+        }
+        else
+        {
+            reinterpret_cast<NativeThreadLinux*> (thread_sp.get ())->SetExited ();
+        }
+
         message = ProcessMessage::Limbo(pid, (data >> 8));
-        // FIXME save the exit code
-        monitor->SetState (StateType::eStateExited);
+        if (is_main_thread)
+            monitor->SetExitStatus (data >> 8, nullptr, true);
+
         break;
     }
 
@@ -2253,9 +2289,6 @@ NativeProcessLinux::Kill ()
         error.SetErrorToErrno ();
         return error;
     }
-
-    // FIXME keep track of us having exited
-    // SetPrivateState(eStateExited);
 
     return error;
 }

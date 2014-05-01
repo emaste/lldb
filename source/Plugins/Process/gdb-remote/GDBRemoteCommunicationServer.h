@@ -223,6 +223,9 @@ protected:
     SendOKResponse ();
 
     PacketResult
+    SendWResponse (lldb_private::NativeProcessProtocol *process);
+
+    PacketResult
     Handle_A (StringExtractorGDBRemote &packet);
     
     PacketResult
