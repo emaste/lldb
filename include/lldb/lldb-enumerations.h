@@ -764,6 +764,16 @@ namespace lldb {
         eWatchpointKindWrite = (1u << 1)
     } WatchpointKind;
 
+    typedef enum GdbSignal
+    {
+        eGdbSignalBadAccess      = 0x91,
+        eGdbSignalBadInstruction = 0x92,
+        eGdbSignalArithmetic     = 0x93,
+        eGdbSignalEmulation      = 0x94,
+        eGdbSignalSoftware       = 0x95,
+        eGdbSignalBreakpoint     = 0x96
+    } GdbRemoteSignal;
+
 } // namespace lldb
 
 

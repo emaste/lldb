@@ -55,6 +55,9 @@ namespace lldb_private
         virtual bool
         GetStopReason (ThreadStopInfo &stop_info) = 0;
 
+        virtual uint32_t
+        TranslateExceptionToGdbSignal (const ThreadStopInfo &stop_info) const;
+
         lldb::tid_t
         GetID() const
         {

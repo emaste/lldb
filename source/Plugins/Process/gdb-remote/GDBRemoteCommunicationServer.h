@@ -211,7 +211,10 @@ protected:
     uint32_t m_proc_infos_index;
     PortMap m_port_map;
     uint16_t m_port_offset;
-
+    lldb::tid_t m_current_tid;
+    lldb_private::Mutex m_debugged_process_mutex;
+    lldb_private::NativeProcessProtocolSP m_debugged_process_sp;
+    lldb::DebuggerSP m_debugger_sp;
 
     PacketResult
     SendUnimplementedResponse (const char *packet);
@@ -224,6 +227,9 @@ protected:
 
     PacketResult
     SendWResponse (lldb_private::NativeProcessProtocol *process);
+
+    PacketResult
+    SendStopReplyPacketForThread (lldb::tid_t tid);
 
     PacketResult
     Handle_A (StringExtractorGDBRemote &packet);
@@ -342,6 +348,9 @@ protected:
     PacketResult
     Handle_qPlatform_shell (StringExtractorGDBRemote &packet);
 
+    void
+    SetCurrentThreadID (lldb::tid_t tid);
+
 private:
     bool
     DebugserverProcessReaped (lldb::pid_t pid);
@@ -379,11 +388,6 @@ private:
     /// Launch a process from lldb-platform
     lldb_private::Error
     LaunchPlatformProcess ();
-
-    // private member variables
-    lldb_private::Mutex m_debugged_process_mutex;
-    lldb_private::NativeProcessProtocolSP m_debugged_process_sp;
-    lldb::DebuggerSP m_debugger_sp;
 
     //------------------------------------------------------------------
     // For GDBRemoteCommunicationServer only

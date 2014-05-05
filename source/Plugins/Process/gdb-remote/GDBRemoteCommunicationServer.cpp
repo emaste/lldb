@@ -29,6 +29,8 @@
 #include "lldb/Host/TimeValue.h"
 #include "lldb/Target/Platform.h"
 #include "lldb/Target/Process.h"
+#include "../../../Host/common/NativeProcessProtocol.h"
+#include "../../../Host/common/NativeThreadProtocol.h"
 
 // Project includes
 #include "Utility/StringExtractorGDBRemote.h"
@@ -69,6 +71,7 @@ GDBRemoteCommunicationServer::GDBRemoteCommunicationServer(bool is_platform) :
     m_proc_infos_index (0),
     m_port_map (),
     m_port_offset(0),
+    m_current_tid (LLDB_INVALID_THREAD_ID),
     m_debugged_process_mutex (Mutex::eMutexTypeRecursive),
     m_debugged_process_sp (),
     m_debugger_sp ()
@@ -245,9 +248,9 @@ GDBRemoteCommunicationServer::GetPacketAndSendResponse (uint32_t timeout_usec,
             packet_result = Handle_vCont_actions (packet);
             break;
 
-        // case StringExtractorGDBRemote::eServerPacketType_stop_reason: // ?
-        //     packet_result = Handle_stop_reason (packet);
-        //     break;
+        case StringExtractorGDBRemote::eServerPacketType_stop_reason: // ?
+            packet_result = Handle_stop_reason (packet);
+            break;
 
         case StringExtractorGDBRemote::eServerPacketType_vFile_open:
             packet_result = Handle_vFile_Open (packet);
@@ -459,6 +462,188 @@ GDBRemoteCommunicationServer::SendWResponse (lldb_private::NativeProcessProtocol
         response.PutHex8 (exit_status);
         return SendPacketNoLock(response.GetData(), response.GetSize());
     }
+}
+
+GDBRemoteCommunication::PacketResult
+GDBRemoteCommunicationServer::SendStopReplyPacketForThread (lldb::tid_t tid)
+{
+    Log *log (GetLogIfAnyCategoriesSet (LIBLLDB_LOG_PROCESS | LIBLLDB_LOG_THREAD));
+
+    // Ensure we're llgs.
+    if (!IsGdbServer ())
+    {
+        // Only supported on llgs
+        return SendUnimplementedResponse ("?");
+    }
+
+    // Ensure we have a debugged process.
+    if (!m_debugged_process_sp || (m_debugged_process_sp->GetID () == LLDB_INVALID_PROCESS_ID))
+        return SendErrorResponse (50);
+
+    if (log)
+        log->Printf ("GDBRemoteCommunicationServer::%s preparing packet for pid %" PRIu64 " tid %" PRIu64,
+                __FUNCTION__, m_debugged_process_sp->GetID (), tid);
+
+    // Ensure we can get info on the given thread.
+    NativeThreadProtocolSP thread_sp (m_debugged_process_sp->GetThreadByID (tid));
+    if (!thread_sp)
+        return SendErrorResponse (51);
+
+    // Grab the reason this thread stopped.
+    struct ThreadStopInfo tid_stop_info;
+    if (!thread_sp->GetStopReason (tid_stop_info))
+        return SendErrorResponse (52);
+
+    const bool did_exec = tid_stop_info.reason == eStopReasonExec;
+    // FIXME implement register handling
+    // if (did_exec)
+    // {
+    //     const bool force = true;
+    //     InitializeRegisters(force);
+    // }
+
+    StreamString response;
+    // Output the T packet with the thread
+    response.PutChar ('T');
+    int signum = tid_stop_info.details.signal.signo;
+    if (log)
+    {
+        log->Printf ("GDBRemoteCommunicationServer::%s pid %" PRIu64 " tid %" PRIu64 " got signal signo = %d, reason = %d, exc_type = %" PRIu64, 
+                __FUNCTION__,
+                m_debugged_process_sp->GetID (),
+                tid,
+                signum,
+                tid_stop_info.reason,
+                tid_stop_info.details.exception.type);
+    }
+
+    switch (tid_stop_info.reason)
+    {
+    case eStopReasonSignal:
+        // Current signal number is good.
+        break;
+    case eStopReasonException:
+        signum = thread_sp->TranslateExceptionToGdbSignal (tid_stop_info);
+        break;
+    default:
+        signum = 0;
+        if (log)
+        {
+            log->Printf ("GDBRemoteCommunicationServer::%s pid %" PRIu64 " tid %" PRIu64 " has stop reason %d, using signo = 0 in stop reply response",
+                __FUNCTION__,
+                m_debugged_process_sp->GetID (),
+                tid,
+                tid_stop_info.reason);
+        }
+        break;
+    }
+
+    // Print the signal number.
+    response.PutHex8 (signum & 0xff);
+
+    // Include the tid.
+    response.PutCString ("thread:");
+    response.PutHex64 (tid);
+    response.PutChar (';');
+
+    // Include the thread name if there is one.
+    const char *thread_name = thread_sp->GetName ();
+    if (thread_name && thread_name[0])
+    {
+        size_t thread_name_len = strlen(thread_name);
+
+        if (::strcspn (thread_name, "$#+-;:") == thread_name_len)
+        {
+            response.PutCString ("name:");
+            response.PutCString (thread_name);
+        }
+        else
+        {
+            // The thread name contains special chars, send as hex bytes.
+            response.PutCString ("hexname:");
+            response.PutCStringAsRawHex8 (thread_name);
+        }
+        response.PutChar (';');
+    }
+
+    // FIXME look for analog
+    // thread_identifier_info_data_t thread_ident_info;
+    // if (DNBThreadGetIdentifierInfo (pid, tid, &thread_ident_info))
+    // {
+    //     if (thread_ident_info.dispatch_qaddr != 0)
+    //         ostrm << std::hex << "qaddr:" << thread_ident_info.dispatch_qaddr << ';';
+    // }
+
+    // FIXME handle QListThreadsInStopReply
+    // If a 'QListThreadsInStopReply' was sent to enable this feature, we
+    // will send all thread IDs back in the "threads" key whose value is
+    // a listc of hex thread IDs separated by commas:
+    //  "threads:10a,10b,10c;"
+    // This will save the debugger from having to send a pair of qfThreadInfo
+    // and qsThreadInfo packets, but it also might take a lot of room in the
+    // stop reply packet, so it must be enabled only on systems where there
+    // are no limits on packet lengths.
+        
+    // if (m_list_threads_in_stop_reply)
+    // {
+    //     const nub_size_t numthreads = DNBProcessGetNumThreads (pid);
+    //     if (numthreads > 0)
+    //     {
+    //         ostrm << std::hex << "threads:";
+    //         for (nub_size_t i = 0; i < numthreads; ++i)
+    //         {
+    //             nub_thread_t th = DNBProcessGetThreadAtIndex (pid, i);
+    //             if (i > 0)
+    //                 ostrm << ',';
+    //             ostrm << std::hex << th;
+    //         }
+    //         ostrm << ';';
+    //     }
+    // }
+
+    // FIXME handle registers
+    // if (g_num_reg_entries == 0)
+    //     InitializeRegisters ();
+
+    // if (g_reg_entries != NULL)
+    // {
+    //     DNBRegisterValue reg_value;
+    //     for (uint32_t reg = 0; reg < g_num_reg_entries; reg++)
+    //     {
+    //         // Expedite all registers in the first register set that aren't
+    //         // contained in other registers
+    //         if (g_reg_entries[reg].nub_info.set == 1 &&
+    //                 g_reg_entries[reg].nub_info.value_regs == NULL)
+    //         {
+    //             if (!DNBThreadGetRegisterValueByID (pid, tid, g_reg_entries[reg].nub_info.set, g_reg_entries[reg].nub_info.reg, &reg_value))
+    //                 continue;
+
+    //             gdb_regnum_with_fixed_width_hex_register_value (ostrm, pid, tid, &g_reg_entries[reg], &reg_value);
+    //         }
+    //     }
+    // }
+
+    if (did_exec)
+    {
+        response.PutCString ("reason:exec;");
+    }
+    else if ((tid_stop_info.reason == eStopReasonException) && tid_stop_info.details.exception.type)
+    {
+        response.PutCString ("metype:");
+        response.PutHex64 (tid_stop_info.details.exception.type);
+        response.PutCString (";mecount:");
+        response.PutHex32 (tid_stop_info.details.exception.data_count);
+        response.PutChar (';');
+
+        for (uint32_t i = 0; i < tid_stop_info.details.exception.data_count; ++i)
+        {
+            response.PutCString ("medata:");
+            response.PutHex64 (tid_stop_info.details.exception.data[i]);
+            response.PutChar (';');
+        }
+    }
+
+    return SendPacketNoLock (response.GetData(), response.GetSize());
 }
 
 void
@@ -1799,6 +1984,117 @@ GDBRemoteCommunicationServer::Handle_qPlatform_shell (StringExtractorGDBRemote &
         }
     }
     return SendErrorResponse(24);
+}
+
+void
+GDBRemoteCommunicationServer::SetCurrentThreadID (lldb::tid_t tid)
+{
+    assert (IsGdbServer () && "SetCurrentThreadID() called when not GdbServer code");
+
+    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_THREAD));
+    if (log)
+        log->Printf ("GDBRemoteCommunicationServer::%s setting current thread id to %" PRIu64, __FUNCTION__, tid);
+
+    m_current_tid = tid;
+    if (m_debugged_process_sp)
+        m_debugged_process_sp->SetCurrentThreadID (m_current_tid);
+}
+
+GDBRemoteCommunication::PacketResult
+GDBRemoteCommunicationServer::Handle_stop_reason (StringExtractorGDBRemote &packet)
+{
+    // Handle the $? gdbremote command.
+    if (!IsGdbServer ())
+        return SendUnimplementedResponse("GDBRemoteCommunicationServer::Handle_stop_reason() unimplemented");
+
+    // If no process, indicate error
+    if (!m_debugged_process_sp)
+        return SendErrorResponse (02);
+
+    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
+
+    const StateType process_state = m_debugged_process_sp->GetState ();
+    switch (process_state)
+    {
+        case eStateAttaching:
+        case eStateLaunching:
+        case eStateRunning:
+        case eStateStepping:
+        case eStateDetached:
+            // NOTE: gdb protocol doc looks like it should return $OK
+            // when everything is running (i.e. no stopped result).
+            return PacketResult::Success;  // Ignore
+
+        case eStateSuspended:
+        case eStateStopped:
+        case eStateCrashed:
+            {
+                lldb::tid_t tid = m_debugged_process_sp->GetCurrentThreadID ();
+                // Make sure we set the current thread so g and p packets return
+                // the data the gdb will expect.
+                SetCurrentThreadID (tid);
+                return SendStopReplyPacketForThread (tid);
+            }
+
+        case eStateInvalid:
+        case eStateUnloaded:
+        case eStateExited:
+            {
+                int exit_status = 0;
+                std::string exit_description;
+
+                if (m_debugged_process_sp->GetExitStatus (&exit_status, exit_description))
+                {
+                    // Process exited with exit status
+                    StreamGDBRemote response;
+                    response.PutChar ('W');
+                    // POSIX exit status limited to unsigned 8 bits.
+                    response.PutHex8 (exit_status);
+                    if (!exit_description.empty ())
+                    {
+                        response.PutCStringAsRawHex8 ("description");
+                        response.PutChar (':');
+                        response.PutCStringAsRawHex8 (exit_description.c_str ());
+                        response.PutChar (';');
+                    }
+                    return SendPacketNoLock(response.GetData(), response.GetSize());
+                }
+                else
+                {
+                    // FIXME handle exit from signal ($X)
+                    // FIXME handle exit in stopped state (?? debugserver's S exit here - unloaded maybe?).
+                    if (log)
+                    {
+                        log->Printf ("GDBRemoteCommunicationServer::%s pid %" PRIu64 " don't have enough info for a good stop reason, state: %s",
+                                __FUNCTION__,
+                                m_debugged_process_sp->GetID (),
+                                StateAsCString (process_state));
+                    }
+
+                    StreamGDBRemote response;
+                    response.PutCString ("W00;");
+                    response.PutCStringAsRawHex8 ("description");
+                    response.PutChar (':');
+                    response.PutCStringAsRawHex8 ("process in state ");
+                    response.PutCStringAsRawHex8 (StateAsCString (process_state));
+                    response.PutChar (';');
+                    return SendPacketNoLock(response.GetData(), response.GetSize());
+                }
+            }
+            break;
+
+    default:
+        if (log)
+        {
+            log->Printf ("GDBRemoteCommunicationServer::%s pid %" PRIu64 ", current state reporting not handled: %s",
+                    __FUNCTION__,
+                    m_debugged_process_sp->GetID (),
+                    StateAsCString (process_state));
+        }
+        break;
+    }
+
+    return SendErrorResponse (0);
 }
 
 GDBRemoteCommunication::PacketResult

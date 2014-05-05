@@ -1668,7 +1668,7 @@ NativeProcessLinux::Launch(LaunchArgs *args)
     listener.OnNewThread (pid);
     thread_sp = monitor->AddThread (static_cast<lldb::tid_t> (pid));
     assert (thread_sp && "AddThread() returned a nullptr thread");
-    reinterpret_cast<NativeThreadLinux*> (thread_sp.get ())->SetStopped ();
+    reinterpret_cast<NativeThreadLinux*> (thread_sp.get ())->SetStoppedBySignal (SIGSTOP);
 
     // Let our process instance know the thread has stopped.
     listener.OnMessage (ProcessMessage::Trace(pid));
@@ -2210,13 +2210,14 @@ NativeProcessLinux::Resume (const ResumeActionList &resume_actions)
             break;
 
         case eStateStepping:
-            // Keep the thread inactive.
             linux_thread_p->SetStepping ();
             break;
 
         case eStateStopped:
-            // Keep the thread inactive.
-            linux_thread_p->SetStopped ();
+            // FIXME does this make sense?  Do we need to feed a
+            // signal to the thread and let that play out? SIGSTOP?
+            // We're already stopped to be resuming, right?
+            linux_thread_p->SetStoppedBySignal (SIGSTOP);
             break;
 
         case eStateSuspended:
@@ -3050,6 +3051,10 @@ NativeProcessLinux::AddThread (lldb::tid_t thread_id)
     }
 
     assert (!HasThreadNoLock (thread_id) && "attempted to add a thread by id that already exists");
+
+    // If this is the first thread, save it as the current thread
+    if (m_threads.empty ())
+        SetCurrentThreadID (thread_id);
 
     NativeThreadProtocolSP thread_sp (new NativeThreadLinux (this, thread_id));
     m_threads.push_back (thread_sp);

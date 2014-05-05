@@ -183,6 +183,24 @@ namespace lldb_private
         NativeThreadProtocolSP
         GetThreadByID (lldb::tid_t tid);
 
+        void
+        SetCurrentThreadID (lldb::tid_t tid)
+        {
+            m_current_thread_id = tid;
+        }
+
+        lldb::tid_t
+        GetCurrentThreadID ()
+        {
+            return m_current_thread_id;
+        }
+
+        NativeThreadProtocolSP
+        GetCurrentThread ()
+        {
+            return GetThreadByID (m_current_thread_id);
+        }
+
         // ---------------------------------------------------------------------
         // Callbacks for low-level process state changes
         // ---------------------------------------------------------------------
@@ -238,6 +256,7 @@ namespace lldb_private
     protected:
         lldb::pid_t m_pid;
         std::vector<NativeThreadProtocolSP> m_threads;
+        lldb::tid_t m_current_thread_id;
         mutable Mutex m_threads_mutex;
         lldb::StateType m_state;
         int m_exit_status;

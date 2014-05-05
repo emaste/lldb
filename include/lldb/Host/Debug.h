@@ -186,13 +186,13 @@ namespace lldb_private {
         lldb::StopReason reason;
         union
         {
-            // eStopTypeSignal
+            // eStopReasonSignal
             struct
             {
                 uint32_t signo;
             } signal;
 
-            // eStopTypeException
+            // eStopReasonException
             struct
             {
                 uint64_t type;

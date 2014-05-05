@@ -28,6 +28,7 @@ using namespace lldb_private;
 NativeProcessProtocol::NativeProcessProtocol (lldb::pid_t pid) :
     m_pid (pid),
     m_threads (),
+    m_current_thread_id (LLDB_INVALID_THREAD_ID),
     m_threads_mutex (Mutex::eMutexTypeRecursive),
     m_state (lldb::eStateInvalid),
     m_exit_status (0),

@@ -56,7 +56,7 @@ namespace lldb_private
         SetStepping ();
 
         void
-        SetStopped ();
+        SetStoppedBySignal (uint32_t signo);
 
         void
         SetSuspended ();
@@ -74,7 +74,7 @@ namespace lldb_private
         // Member Variables
         // ---------------------------------------------------------------------
         lldb::StateType m_state;
-
+        ThreadStopInfo m_stop_info;
     };
 }
 

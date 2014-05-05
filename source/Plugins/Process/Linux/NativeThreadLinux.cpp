@@ -21,7 +21,8 @@ using namespace lldb_private;
 
 NativeThreadLinux::NativeThreadLinux (NativeProcessLinux *process, lldb::tid_t tid) :
     NativeThreadProtocol (process, tid),
-    m_state (StateType::eStateInvalid)
+    m_state (StateType::eStateInvalid),
+    m_stop_info ()
 {
 }
 
@@ -45,8 +46,32 @@ NativeThreadLinux::GetState ()
 bool
 NativeThreadLinux::GetStopReason (ThreadStopInfo &stop_info)
 {
-    // TODO implement
-    return false;
+    Log *log (GetLogIfAllCategoriesSet (LIBLLDB_LOG_THREAD));
+    switch (m_state)
+    {
+    case StateType::eStateStopped:
+    case StateType::eStateCrashed:
+    case StateType::eStateExited:
+    case StateType::eStateSuspended:
+    case StateType::eStateUnloaded:
+        stop_info = m_stop_info;
+        return true;
+
+    case eStateInvalid:
+    case eStateConnected:
+    case eStateAttaching:
+    case eStateLaunching:
+    case eStateRunning:
+    case eStateStepping:
+    case eStateDetached:
+    default:
+        if (log)
+        {
+            log->Printf ("NativeThreadLinux::%s tid %" PRIu64 " in state %s cannot answer stop reason",
+                    __FUNCTION__, GetID (), StateAsCString (m_state));
+        }
+        return false;
+    }
 }
 
 lldb::RegisterContextNativeThreadSP
@@ -76,6 +101,8 @@ NativeThreadLinux::SetRunning ()
     const StateType new_state = StateType::eStateRunning;
     MaybeLogStateChange (new_state);
     m_state = new_state;
+
+    m_stop_info.reason = StopReason::eStopReasonNone;
 }
 
 void
@@ -84,14 +111,19 @@ NativeThreadLinux::SetStepping ()
     const StateType new_state = StateType::eStateStepping;
     MaybeLogStateChange (new_state);
     m_state = new_state;
+
+    m_stop_info.reason = StopReason::eStopReasonNone;
 }
 
 void
-NativeThreadLinux::SetStopped ()
+NativeThreadLinux::SetStoppedBySignal (uint32_t signo)
 {
     const StateType new_state = StateType::eStateStopped;
     MaybeLogStateChange (new_state);
     m_state = new_state;
+
+    m_stop_info.reason = StopReason::eStopReasonSignal;
+    m_stop_info.details.signal.signo = signo;
 }
 
 void
@@ -100,6 +132,9 @@ NativeThreadLinux::SetSuspended ()
     const StateType new_state = StateType::eStateSuspended;
     MaybeLogStateChange (new_state);
     m_state = new_state;
+
+    // FIXME what makes sense here? Do we need a suspended StopReason?
+    m_stop_info.reason = StopReason::eStopReasonNone;
 }
 
 void
@@ -108,6 +143,8 @@ NativeThreadLinux::SetExited ()
     const StateType new_state = StateType::eStateExited;
     MaybeLogStateChange (new_state);
     m_state = new_state;
+
+    m_stop_info.reason = StopReason::eStopReasonThreadExiting;
 }
 
 void

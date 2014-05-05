@@ -73,3 +73,12 @@ NativeThreadProtocol::GetProcess ()
 {
     return m_process_wp.lock ();
 }
+
+uint32_t
+NativeThreadProtocol::TranslateExceptionToGdbSignal (const ThreadStopInfo &stop_info) const
+{
+    // Default implementation does nothing.
+    // Derived classes should override if they have anything to do
+    // here.
+    return 0;
+}
