@@ -11,6 +11,7 @@
 #define liblldb_Debug_h_
 
 #include "lldb/lldb-private.h"
+#include <vector>
 
 namespace lldb_private {
 

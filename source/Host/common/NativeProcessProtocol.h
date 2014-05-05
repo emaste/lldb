@@ -10,6 +10,7 @@
 #ifndef liblldb_NativeProcessProtocol_h_
 #define liblldb_NativeProcessProtocol_h_
 
+#include <vector>
 #include "lldb/lldb-private-forward.h"
 #include "lldb/lldb-types.h"
 #include "lldb/Core/Error.h"
