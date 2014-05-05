@@ -57,6 +57,9 @@ namespace lldb_private
             virtual void
             OnMessage (const ProcessMessage &message) = 0;
 
+            /// XXXFreeBSD: New td handling will be completely different;
+            /// need to figure out what actually belongs in the
+            /// NativeProcessProtocol vs Linux-specific.
             /// Notify that a new thread (possibly the first thread of the
             /// inferior process) is being tracked.  It might be in a
             /// start-up state that is not entirely stable yet as far as
@@ -146,6 +149,7 @@ namespace lldb_private
         WriteRegisterValue(lldb::tid_t tid, unsigned offset, const char *reg_name,
                 const lldb_private::RegisterValue &value);
 
+        /// XXX clean up reg read/write interface - bring GPR/FPR into RegisterSet?
         /// Reads all general purpose registers into the specified buffer.
         bool
         ReadGPR(lldb::tid_t tid, void *buf, size_t buf_size);
@@ -197,6 +201,7 @@ namespace lldb_private
         bool
         SingleStep(lldb::tid_t tid, uint32_t signo);
 
+        /// XXXFreeBSD
         /// Sends the inferior process a PTRACE_KILL signal.  The inferior will
         /// still exist and can be interrogated.  Once resumed it will exit as
         /// though it received a SIGKILL.
