@@ -198,7 +198,7 @@ namespace lldb_private
         SingleStep(lldb::tid_t tid, uint32_t signo);
 
         /// Sends the inferior process a PTRACE_KILL signal.  The inferior will
-        /// still exists and can be interrogated.  Once resumed it will exit as
+        /// still exist and can be interrogated.  Once resumed it will exit as
         /// though it received a SIGKILL.
         bool
         BringProcessIntoLimbo();
