@@ -410,8 +410,9 @@ PlatformLinux::GetSoftwareBreakpointTrapOpcode (Target &target,
 Error
 PlatformLinux::LaunchProcess (ProcessLaunchInfo &launch_info)
 {
+#if defined(__Linux__)
     Error error;
-    
+
     if (IsHost())
     {
         if (launch_info.GetFlags().Test (eLaunchFlagLaunchInShell))
@@ -434,6 +435,9 @@ PlatformLinux::LaunchProcess (ProcessLaunchInfo &launch_info)
         error.SetErrorString ("the platform is not currently connected");
     }
     return error;
+#else
+    return Error("Cannot launch a Linux process on a non-Linux host");
+#endif
 }
 
 lldb::ProcessSP
@@ -496,6 +500,7 @@ PlatformLinux::LaunchDebugProcess (
     lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
     NativeProcessProtocolSP &process_sp)
 {
+#if defined(__Linux__)
     if (!IsHost ())
         return Error("PlatformLinux::%s (): cannot launch a debug process when not the host", __FUNCTION__);
 
@@ -522,4 +527,7 @@ PlatformLinux::LaunchDebugProcess (
         process_sp);
 
     return error;
+#else
+        return Error("Cannot launch a Linux process on a non-Linux host");
+#endif
 }
