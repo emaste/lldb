@@ -122,8 +122,7 @@ _GDB_REMOTE_PACKET_REGEX = re.compile(r'^\$([^\#]*)#[0-9a-fA-F]{2}')
 def expect_lldb_gdbserver_replay(
     asserter,
     sock,
-    log_lines,
-    read_is_llgs_input,
+    test_sequence,
     timeout_seconds,
     logger=None):
     """Replay socket communication with lldb-gdbserver and verify responses.
@@ -133,22 +132,14 @@ def expect_lldb_gdbserver_replay(
 
         sock: the TCP socket connected to the lldb-gdbserver exe.
 
-        log_lines: an array of text lines output from packet logging
-           within lldb or lldb-gdbserver. Should look something like
-           this:
-
-           lldb-gdbserver <  19> read packet: $QStartNoAckMode#b0
-           lldb-gdbserver <   1> send packet: +
-           lldb-gdbserver <   6> send packet: $OK#9a
-           lldb-gdbserver <   1> read packet: +
-
-        read_is_llgs_input: True if packet logs list lldb-gdbserver
-           input as the read side. False if lldb-gdbserver input is
-           listed as the send side. Logs could be generated from
-           either side, and this just allows supporting either one.
+        test_sequence: a GdbRemoteTestSequence instance that describes
+            the messages sent to the gdb remote and the responses
+            expected from it.
 
         timeout_seconds: any response taking more than this number of
            seconds will cause an exception to be raised.
+
+        logger: a Python logger instance.
 
     Returns:
         None if no issues.  Raises an exception if the expected communication does not
@@ -157,73 +148,63 @@ def expect_lldb_gdbserver_replay(
     """
     received_lines = []
     receive_buffer = ''
+    context = {}
 
-    for packet in log_lines:
-        if logger:
-            logger.debug("processing log line: {}".format(packet))
-        match = _LOG_LINE_REGEX.match(packet)
-        if match:
-            playback_packet = match.group(4)
-            if _is_packet_lldb_gdbserver_input(
-                    match.group(3),
-                    read_is_llgs_input):
-                # handle as something to send to lldb-gdbserver on
-                # socket.
-                if logger:
-                    logger.info("sending packet to llgs: {}".format(playback_packet))
-                sock.sendall(playback_packet)
-            else:
-                # expect it as output from lldb-gdbserver received
-                # from socket.
-                if logger:
-                    logger.info("receiving packet from llgs, should match: {}".format(playback_packet))
-                start_time = time.time()
-                timeout_time = start_time + timeout_seconds
+    for sequence_entry in test_sequence.entries:
+        if sequence_entry.is_send_to_remote:
+            # This is an entry to send to the remote debug monitor.
+            if logger:
+                logger.info("sending packet to remote: {}".format(sequence_entry.exact_payload))
+            sock.sendall(sequence_entry.exact_payload)
+        else:
+            # This is an entry to expect to receive from the remote debug monitor.
+            if logger:
+                logger.info("receiving packet from remote, should match: {}".format(sequence_entry.exact_payload))
 
-                # while we don't have a complete line of input, wait
-                # for it from socket.
-                while len(received_lines) < 1:
-                    # check for timeout
-                    if time.time() > timeout_time:
-                        raise Exception(
-                            'timed out after {} seconds while waiting for llgs to respond with: {}, currently received: {}'.format(
-                                timeout_seconds, playback_packet, receive_buffer))
-                    can_read, _, _ = select.select(
-                        [sock], [], [], 0)
-                    if can_read and sock in can_read:
-                        new_bytes = sock.recv(4096)
-                        if new_bytes and len(new_bytes) > 0:
-                            # read the next bits from the socket
-                            if logger:
-                                logger.debug("llgs responded with bytes: {}".format(new_bytes))
-                            receive_buffer += new_bytes
+            start_time = time.time()
+            timeout_time = start_time + timeout_seconds
 
-                            # parse fully-formed packets into individual packets
-                            has_more = len(receive_buffer) > 0
-                            while has_more:
-                                if len(receive_buffer) <= 0:
-                                    has_more = False
-                                # handle '+' ack
-                                elif receive_buffer[0] == '+':
-                                    received_lines.append('+')
-                                    receive_buffer = receive_buffer[1:]
+            # while we don't have a complete line of input, wait
+            # for it from socket.
+            while len(received_lines) < 1:
+                # check for timeout
+                if time.time() > timeout_time:
+                    raise Exception(
+                        'timed out after {} seconds while waiting for llgs to respond with: {}, currently received: {}'.format(
+                            timeout_seconds, sequence_entry.exact_payload, receive_buffer))
+                can_read, _, _ = select.select([sock], [], [], 0)
+                if can_read and sock in can_read:
+                    new_bytes = sock.recv(4096)
+                    if new_bytes and len(new_bytes) > 0:
+                        # read the next bits from the socket
+                        if logger:
+                            logger.debug("llgs responded with bytes: {}".format(new_bytes))
+                        receive_buffer += new_bytes
+
+                        # parse fully-formed packets into individual packets
+                        has_more = len(receive_buffer) > 0
+                        while has_more:
+                            if len(receive_buffer) <= 0:
+                                has_more = False
+                            # handle '+' ack
+                            elif receive_buffer[0] == '+':
+                                received_lines.append('+')
+                                receive_buffer = receive_buffer[1:]
+                                if logger:
+                                    logger.debug('parsed packet from llgs: +, new receive_buffer: {}'.format(receive_buffer))
+                            else:
+                                packet_match = _GDB_REMOTE_PACKET_REGEX.match(receive_buffer)
+                                if packet_match:
+                                    received_lines.append(packet_match.group(0))
+                                    receive_buffer = receive_buffer[len(packet_match.group(0)):]
                                     if logger:
-                                        logger.debug('parsed packet from llgs: +, new receive_buffer: {}'.format(receive_buffer))
+                                        logger.debug('parsed packet from llgs: {}, new receive_buffer: {}'.format(packet_match.group(0), receive_buffer))
                                 else:
-                                    packet_match = _GDB_REMOTE_PACKET_REGEX.match(receive_buffer)
-                                    if packet_match:
-                                        received_lines.append(packet_match.group(0))
-                                        receive_buffer = receive_buffer[len(packet_match.group(0)):]
-                                        if logger:
-                                            logger.debug('parsed packet from llgs: {}, new receive_buffer: {}'.format(packet_match.group(0), receive_buffer))
-                                    else:
-                                        has_more = False
-
-                # got a line - now try to match it against expected line
-                if len(received_lines) > 0:
-                    received_packet = received_lines.pop(0)
-                    assert_packets_equal(asserter, received_packet, playback_packet)
-
+                                    has_more = False
+            # got a line - now try to match it against expected line
+            if len(received_lines) > 0:
+                received_packet = received_lines.pop(0)
+                context = sequence_entry.assert_match(asserter, received_packet, context=context)
     return None
 
 
@@ -264,6 +245,166 @@ def build_gdbremote_A_packet(args_list):
 
     # return the packetized payload
     return gdbremote_packet_encode_string(payload)
+
+class GdbRemoteEntry(object):
+
+    def __init__(self, is_send_to_remote=True, exact_payload=None, regex=None, capture=None, expect_captures=None):
+        """Create an entry representing one piece of the I/O to/from a gdb remote debug monitor.
+
+        Args:
+
+            is_send_to_remote: True if this entry is a message to be
+                sent to the gdbremote debug monitor; False if this
+                entry represents text to be matched against the reply
+                from the gdbremote debug monitor.
+
+            exact_payload: if not None, then this packet is an exact
+                send (when sending to the remote) or an exact match of
+                the response from the gdbremote. The checksums are
+                ignored on exact match requests since negotiation of
+                no-ack makes the checksum content essentially
+                undefined.
+
+            regex: currently only valid for receives from gdbremote.
+                When specified (and only if exact_payload is None),
+                indicates the gdbremote response must match the given
+                regex. Match groups in the regex can be used for two
+                different purposes: saving the match (see capture
+                arg), or validating that a match group matches a
+                previously established value (see expect_captures). It
+                is perfectly valid to have just a regex arg and to
+                specify neither capture or expect_captures args. This
+                arg only makes sense if exact_payload is not
+                specified.
+
+            capture: if specified, is a dictionary of regex match
+                group indices (should start with 1) to variable names
+                that will store the capture group indicated by the
+                index. For example, {1:"thread_id"} will store capture
+                group 1's content in the context dictionary where
+                "thread_id" is the key and the match group value is
+                the value. The value stored off can be used later in a
+                expect_captures expression. This arg only makes sense
+                when regex is specified.
+
+            expect_captures: if specified, is a dictionary of regex
+                match group indices (should start with 1) to variable
+                names, where the match group should match the value
+                existing in the context at the given variable name.
+                For example, {2:"thread_id"} indicates that the second
+                match group must match the value stored under the
+                context's previously stored "thread_id" key. This arg
+                only makes sense when regex is specified.
+        """
+        self.is_send_to_remote = is_send_to_remote
+        self.exact_payload = exact_payload
+        self.regex = regex
+        self.capture = capture
+        self.expect_captures = expect_captures
+
+    def is_send_to_remote(self):
+        return self.is_send_to_remote
+
+    def _assert_exact_payload_match(self, asserter, actual_packet):
+        assert_packets_equal(asserter, actual_packet, self.exact_payload)
+        return None
+
+    def _assert_regex_match(self, asserter, actual_packet, context):
+        # Ensure the actual packet matches from the start of the actual packet.
+        match = self.regex.match(actual_packet)
+        asserter.assertIsNotNone(match)
+
+        if self.capture:
+            # Handle captures.
+            for group_index, var_name in self.capture.items():
+                capture_text = match.group(group_index)
+                if not capture_text:
+                    raise Exception("No content for group index {}".format(group_index))
+                context[var_name] = capture_text
+
+        if self.expect_captures:
+            # Handle comparing matched groups to context dictionary entries.
+            for group_index, var_name in self.expect_captures.items():
+                capture_text = match.group(group_index)
+                if not capture_text:
+                    raise Exception("No content to expect for group index {}".format(group_index))
+                asserter.assertEquals(capture_text, context[var_name])
+
+        return context
+
+    def assert_match(self, asserter, actual_packet, context=None):
+        # This only makes sense for matching lines coming from the
+        # remote debug monitor.
+        if self.is_send_to_remote:
+            raise Exception("Attempted to match a packet being sent to the remote debug monitor, doesn't make sense.")
+
+        # Create a new context if needed.
+        if not context:
+            context = {}
+
+        # If this is an exact payload, ensure they match exactly,
+        # ignoring the packet checksum which is optional for no-ack
+        # mode.
+        if self.exact_payload:
+            self._assert_exact_payload_match(asserter, actual_packet)
+            return context
+        elif self.regex:
+            return self._assert_regex_match(asserter, actual_packet, context)
+        else:
+            raise Exception("Don't know how to match a remote-sent packet when exact_payload isn't specified.")
+
+class GdbRemoteTestSequence(object):
+
+    _LOG_LINE_REGEX = re.compile(r'^.*(read|send)\s+packet:\s+(.+)$')
+
+    def __init__(self, logger):
+        self.entries = []
+        self.logger = logger
+
+    def add_log_lines(self, log_lines, remote_input_is_read):
+        for line in log_lines:
+            if type(line) == str:
+                # Handle log line import
+                if self.logger:
+                    self.logger.debug("processing log line: {}".format(line))
+                match = self._LOG_LINE_REGEX.match(line)
+                if match:
+                    playback_packet = match.group(2)
+                    direction = match.group(1)
+                    if _is_packet_lldb_gdbserver_input(direction, remote_input_is_read):
+                        # Handle as something to send to the remote debug monitor.
+                        if self.logger:
+                            self.logger.info("processed packet to send to remote: {}".format(playback_packet))
+                        self.entries.append(GdbRemoteEntry(is_send_to_remote=True, exact_payload=playback_packet))
+                    else:
+                        # Log line represents content to be expected from the remote debug monitor.
+                        if self.logger:
+                            self.logger.info("receiving packet from llgs, should match: {}".format(playback_packet))
+                        self.entries.append(GdbRemoteEntry(is_send_to_remote=False,exact_payload=playback_packet))
+                else:
+                    raise Exception("failed to interpret log line: {}".format(line))
+            elif type(line) == dict:
+                # Handle more explicit control over details via dictionary.
+                direction = line.get("direction", None)
+                regex = line.get("regex", None)
+                capture = line.get("capture", None)
+                expect_captures = line.get("expect_captures", None)
+
+                # Compile the regex.
+                if regex and (type(regex) == str):
+                    regex = re.compile(regex)
+
+                if _is_packet_lldb_gdbserver_input(direction, remote_input_is_read):
+                    # Handle as something to send to the remote debug monitor.
+                    if self.logger:
+                        self.logger.info("processed dict sequence to send to remote")
+                    self.entries.append(GdbRemoteEntry(is_send_to_remote=True, regex=regex, capture=capture, expect_captures=expect_captures))
+                else:
+                    # Log line represents content to be expected from the remote debug monitor.
+                    if self.logger:
+                        self.logger.info("processed dict sequence to match receiving from remote")
+                    self.entries.append(GdbRemoteEntry(is_send_to_remote=False, regex=regex, capture=capture, expect_captures=expect_captures))
+
 
 if __name__ == '__main__':
     EXE_PATH = get_lldb_gdbserver_exe()
