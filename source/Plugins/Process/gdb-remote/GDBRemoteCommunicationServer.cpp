@@ -180,6 +180,10 @@ GDBRemoteCommunicationServer::GetPacketAndSendResponse (uint32_t timeout_usec,
             packet_result = Handle_qGroupName (packet);
             break;
 
+        case StringExtractorGDBRemote::eServerPacketType_qProcessInfo:
+            packet_result = Handle_qProcessInfo (packet);
+            break;
+                
         case StringExtractorGDBRemote::eServerPacketType_qProcessInfoPID:
             packet_result = Handle_qProcessInfoPID (packet);
             break;
@@ -542,9 +546,7 @@ GDBRemoteCommunicationServer::SendStopReplyPacketForThread (lldb::tid_t tid)
     response.PutHex8 (signum & 0xff);
 
     // Include the tid.
-    response.PutCString ("thread:");
-    response.PutHex64 (tid);
-    response.PutChar (';');
+    response.Printf ("thread:%" PRIx64 ";", tid);
 
     // Include the thread name if there is one.
     const char *thread_name = thread_sp->GetName ();
@@ -842,6 +844,71 @@ CreateProcessInfoResponse (const ProcessInstanceInfo &proc_info, StreamString &r
         response.PutCStringAsRawHex8(proc_triple.getTriple().c_str());
         response.PutChar(';');
     }
+}
+
+static void
+CreateProcessInfoResponse_DebugServerStyle (const ProcessInstanceInfo &proc_info, StreamString &response)
+{
+    response.Printf ("pid:%" PRIx64 ";parent-pid:%" PRIx64 ";real-uid:%x;real-gid:%x;effective-uid:%x;effective-gid:%x;",
+                     proc_info.GetProcessID(),
+                     proc_info.GetParentProcessID(),
+                     proc_info.GetUserID(),
+                     proc_info.GetGroupID(),
+                     proc_info.GetEffectiveUserID(),
+                     proc_info.GetEffectiveGroupID());
+
+    const ArchSpec &proc_arch = proc_info.GetArchitecture();
+    if (proc_arch.IsValid())
+    {
+        const uint32_t cpu_type = proc_arch.GetMachOCPUType();
+        if (cpu_type != 0)
+            response.Printf ("cputype:%" PRIx32 ";", cpu_type);
+        
+        const uint32_t cpu_subtype = proc_arch.GetMachOCPUSubType();
+        if (cpu_subtype != 0)
+            response.Printf ("cpusubtype:%" PRIx32 ";", cpu_subtype);
+        
+        // FIXME debugserver equivalence: adjust so ostype reports ios for Apple/ARM and Apple/ARM64.
+        // Ultimate output should be ostype:{ios,macosx,...};vendor:{apple,...};
+        // and technically not contain triple:{...}.
+        const llvm::Triple &proc_triple = proc_arch.GetTriple();
+        response.PutCString("triple:");
+        response.PutCStringAsRawHex8(proc_triple.getTriple().c_str());
+        response.PutChar(';');
+    }
+
+#if defined (__LITTLE_ENDIAN__)
+    response.PutCString ("endian:little;");
+#elif defined (__BIG_ENDIAN__)
+    response.PutCString ("endian:big;");
+#elif defined (__PDP_ENDIAN__)
+    response.PutCString ("endian:pdp;");
+#endif
+    
+    // FIXME debugserver equivalence: work out the pointer size and return ptrsize:{4,8,...}.
+}
+
+
+GDBRemoteCommunication::PacketResult
+GDBRemoteCommunicationServer::Handle_qProcessInfo (StringExtractorGDBRemote &packet)
+{
+    // Only the gdb server handles this.
+    if (!IsGdbServer ())
+        return SendUnimplementedResponse (packet.GetStringRef ().c_str ());
+    
+    // Fail if we don't have a current process.
+    if (!m_debugged_process_sp || (m_debugged_process_sp->GetID () == LLDB_INVALID_PROCESS_ID))
+        return SendErrorResponse (68);
+    
+    ProcessInstanceInfo proc_info;
+    if (Host::GetProcessInfo (m_debugged_process_sp->GetID (), proc_info))
+    {
+        StreamString response;
+        CreateProcessInfoResponse_DebugServerStyle(proc_info, response);
+        return SendPacketNoLock (response.GetData (), response.GetSize ());
+    }
+    
+    return SendErrorResponse (1);
 }
 
 GDBRemoteCommunication::PacketResult

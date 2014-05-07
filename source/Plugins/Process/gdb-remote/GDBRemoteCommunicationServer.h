@@ -254,7 +254,10 @@ protected:
     
     PacketResult
     Handle_qPlatform_chmod (StringExtractorGDBRemote &packet);
-    
+
+    PacketResult
+    Handle_qProcessInfo (StringExtractorGDBRemote &packet);
+
     PacketResult
     Handle_qProcessInfoPID (StringExtractorGDBRemote &packet);
     

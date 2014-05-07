@@ -339,7 +339,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_first_launch_stop_reply_thread_matches_first_qC_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()
@@ -382,7 +381,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_qProcessInfo_returns_running_process_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()

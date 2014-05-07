@@ -10,6 +10,7 @@
 #ifndef liblldb_Debug_h_
 #define liblldb_Debug_h_
 
+#include <vector>
 #include "lldb/lldb-private.h"
 
 namespace lldb_private {
