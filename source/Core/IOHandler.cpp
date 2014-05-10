@@ -529,6 +529,7 @@ IOHandlerEditline::GetLines (StringList &lines, bool &interrupted)
     else
     {
         LineStatus lines_status = LineStatus::Success;
+        Error error;
 
         while (lines_status == LineStatus::Success)
         {
@@ -551,7 +552,6 @@ IOHandlerEditline::GetLines (StringList &lines, bool &interrupted)
                 else
                 {
                     lines.AppendString(line);
-                    Error error;
                     lines_status = m_delegate.IOHandlerLinesUpdated(*this, lines, lines.GetSize() - 1, error);
                 }
             }
@@ -560,6 +560,11 @@ IOHandlerEditline::GetLines (StringList &lines, bool &interrupted)
                 lines_status = LineStatus::Done;
             }
         }
+        
+        // Call the IOHandlerLinesUpdated function with UINT32_MAX as the line
+        // number to indicate all lines are complete
+        m_delegate.IOHandlerLinesUpdated(*this, lines, UINT32_MAX, error);
+
         success = lines.GetSize() > 0;
     }
     return success;
@@ -613,7 +618,7 @@ IOHandlerEditline::Run ()
 void
 IOHandlerEditline::Hide ()
 {
-    if (m_editline_ap && m_editline_ap->GettingLine())
+    if (m_editline_ap)
         m_editline_ap->Hide();
 }
 
@@ -621,8 +626,10 @@ IOHandlerEditline::Hide ()
 void
 IOHandlerEditline::Refresh ()
 {
-    if (m_editline_ap && m_editline_ap->GettingLine())
+    if (m_editline_ap)
+    {
         m_editline_ap->Refresh();
+    }
     else
     {
         const char *prompt = GetPrompt();
