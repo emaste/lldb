@@ -33,7 +33,9 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Target/Process.h"
 
+#if defined(__linux__)
 #include "../../Process/Linux/NativeProcessLinux.h"
+#endif
 
 using namespace lldb;
 using namespace lldb_private;
@@ -496,6 +498,9 @@ PlatformLinux::LaunchDebugProcess (
     lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
     NativeProcessProtocolSP &process_sp)
 {
+#if !defined(__linux__)
+    return Error("not implemented on Non-Linux host");
+#else
     if (!IsHost ())
         return Error("PlatformLinux::%s (): cannot launch a debug process when not the host", __FUNCTION__);
 
@@ -522,4 +527,5 @@ PlatformLinux::LaunchDebugProcess (
         process_sp);
 
     return error;
+#endif
 }

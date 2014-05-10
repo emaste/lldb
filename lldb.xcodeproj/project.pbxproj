@@ -63,6 +63,16 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		232CB615191E00CD00EF39FC /* NativeBreakpoint.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 232CB60B191E00CC00EF39FC /* NativeBreakpoint.cpp */; };
+		232CB616191E00CD00EF39FC /* NativeBreakpoint.h in Headers */ = {isa = PBXBuildFile; fileRef = 232CB60C191E00CC00EF39FC /* NativeBreakpoint.h */; };
+		232CB617191E00CD00EF39FC /* NativeBreakpointList.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 232CB60D191E00CC00EF39FC /* NativeBreakpointList.cpp */; };
+		232CB618191E00CD00EF39FC /* NativeBreakpointList.h in Headers */ = {isa = PBXBuildFile; fileRef = 232CB60E191E00CC00EF39FC /* NativeBreakpointList.h */; };
+		232CB619191E00CD00EF39FC /* NativeProcessProtocol.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 232CB60F191E00CC00EF39FC /* NativeProcessProtocol.cpp */; };
+		232CB61A191E00CD00EF39FC /* NativeProcessProtocol.h in Headers */ = {isa = PBXBuildFile; fileRef = 232CB610191E00CC00EF39FC /* NativeProcessProtocol.h */; };
+		232CB61B191E00CD00EF39FC /* NativeThreadProtocol.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 232CB611191E00CC00EF39FC /* NativeThreadProtocol.cpp */; };
+		232CB61C191E00CD00EF39FC /* NativeThreadProtocol.h in Headers */ = {isa = PBXBuildFile; fileRef = 232CB612191E00CC00EF39FC /* NativeThreadProtocol.h */; };
+		232CB61D191E00CD00EF39FC /* SoftwareBreakpoint.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 232CB613191E00CC00EF39FC /* SoftwareBreakpoint.cpp */; };
+		232CB61E191E00CD00EF39FC /* SoftwareBreakpoint.h in Headers */ = {isa = PBXBuildFile; fileRef = 232CB614191E00CD00EF39FC /* SoftwareBreakpoint.h */; };
 		260157C61885F51C00F875CF /* libpanel.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 260157C41885F4FF00F875CF /* libpanel.dylib */; };
 		260157C71885F52500F875CF /* libpanel.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 260157C41885F4FF00F875CF /* libpanel.dylib */; };
 		260157C81885F53100F875CF /* libpanel.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 260157C41885F4FF00F875CF /* libpanel.dylib */; };
@@ -894,6 +904,16 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		232CB60B191E00CC00EF39FC /* NativeBreakpoint.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = NativeBreakpoint.cpp; path = source/Host/common/NativeBreakpoint.cpp; sourceTree = "<group>"; };
+		232CB60C191E00CC00EF39FC /* NativeBreakpoint.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = NativeBreakpoint.h; path = source/Host/common/NativeBreakpoint.h; sourceTree = "<group>"; };
+		232CB60D191E00CC00EF39FC /* NativeBreakpointList.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = NativeBreakpointList.cpp; path = source/Host/common/NativeBreakpointList.cpp; sourceTree = "<group>"; };
+		232CB60E191E00CC00EF39FC /* NativeBreakpointList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = NativeBreakpointList.h; path = source/Host/common/NativeBreakpointList.h; sourceTree = "<group>"; };
+		232CB60F191E00CC00EF39FC /* NativeProcessProtocol.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = NativeProcessProtocol.cpp; path = source/Host/common/NativeProcessProtocol.cpp; sourceTree = "<group>"; };
+		232CB610191E00CC00EF39FC /* NativeProcessProtocol.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = NativeProcessProtocol.h; path = source/Host/common/NativeProcessProtocol.h; sourceTree = "<group>"; };
+		232CB611191E00CC00EF39FC /* NativeThreadProtocol.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = NativeThreadProtocol.cpp; path = source/Host/common/NativeThreadProtocol.cpp; sourceTree = "<group>"; };
+		232CB612191E00CC00EF39FC /* NativeThreadProtocol.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = NativeThreadProtocol.h; path = source/Host/common/NativeThreadProtocol.h; sourceTree = "<group>"; };
+		232CB613191E00CC00EF39FC /* SoftwareBreakpoint.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SoftwareBreakpoint.cpp; path = source/Host/common/SoftwareBreakpoint.cpp; sourceTree = "<group>"; };
+		232CB614191E00CD00EF39FC /* SoftwareBreakpoint.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SoftwareBreakpoint.h; path = source/Host/common/SoftwareBreakpoint.h; sourceTree = "<group>"; };
 		260157C41885F4FF00F875CF /* libpanel.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libpanel.dylib; path = /usr/lib/libpanel.dylib; sourceTree = "<absolute>"; };
 		260223E7115F06D500A601A2 /* SBCommunication.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SBCommunication.h; path = include/lldb/API/SBCommunication.h; sourceTree = "<group>"; };
 		260223E8115F06E500A601A2 /* SBCommunication.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SBCommunication.cpp; path = source/API/SBCommunication.cpp; sourceTree = "<group>"; };
@@ -3312,6 +3332,16 @@
 		26BC7DD010F1B7C100F91463 /* Host */ = {
 			isa = PBXGroup;
 			children = (
+				232CB60B191E00CC00EF39FC /* NativeBreakpoint.cpp */,
+				232CB60C191E00CC00EF39FC /* NativeBreakpoint.h */,
+				232CB60D191E00CC00EF39FC /* NativeBreakpointList.cpp */,
+				232CB60E191E00CC00EF39FC /* NativeBreakpointList.h */,
+				232CB60F191E00CC00EF39FC /* NativeProcessProtocol.cpp */,
+				232CB610191E00CC00EF39FC /* NativeProcessProtocol.h */,
+				232CB611191E00CC00EF39FC /* NativeThreadProtocol.cpp */,
+				232CB612191E00CC00EF39FC /* NativeThreadProtocol.h */,
+				232CB613191E00CC00EF39FC /* SoftwareBreakpoint.cpp */,
+				232CB614191E00CD00EF39FC /* SoftwareBreakpoint.h */,
 				69A01E1A1236C5D400C660B5 /* common */,
 				26BC7EE510F1B88100F91463 /* MacOSX */,
 				26BC7DD210F1B7D500F91463 /* Condition.h */,
@@ -4043,6 +4073,7 @@
 				26FFC19C14FC072100087D58 /* DYLDRendezvous.h in Headers */,
 				AF1F7B08189C904B0087DB9C /* AppleGetPendingItemsHandler.h in Headers */,
 				AF2BCA6D18C7EFDE005B4526 /* JITLoaderGDB.h in Headers */,
+				232CB61E191E00CD00EF39FC /* SoftwareBreakpoint.h in Headers */,
 				26BC17B218C7F4CB00D2196D /* ThreadElfCore.h in Headers */,
 				26FFC19E14FC072100087D58 /* DynamicLoaderPOSIXDYLD.h in Headers */,
 				AF254E32170CCC33007AE5C9 /* PlatformDarwinKernel.h in Headers */,
@@ -4060,6 +4091,7 @@
 				260CC63115D04377002BF2E0 /* OptionValueProperties.h in Headers */,
 				260CC63215D04377002BF2E0 /* OptionValueDictionary.h in Headers */,
 				262173A118395D3800C52091 /* SectionLoadHistory.h in Headers */,
+				232CB61A191E00CD00EF39FC /* NativeProcessProtocol.h in Headers */,
 				260CC63315D04377002BF2E0 /* OptionValueEnumeration.h in Headers */,
 				AF45FDE618A1F3AC0007051C /* AppleGetThreadItemInfoHandler.h in Headers */,
 				260A63171861008E00FECF8E /* IOHandler.h in Headers */,
@@ -4095,7 +4127,10 @@
 				26474CBF18D0CB2D0073DEBA /* RegisterContextMach_i386.h in Headers */,
 				26474CC118D0CB2D0073DEBA /* RegisterContextMach_x86_64.h in Headers */,
 				2698699D15E6CBD0002415FF /* OperatingSystemPython.h in Headers */,
+				232CB618191E00CD00EF39FC /* NativeBreakpointList.h in Headers */,
 				260D9B2715EC369500960137 /* ModuleSpec.h in Headers */,
+				232CB61C191E00CD00EF39FC /* NativeThreadProtocol.h in Headers */,
+				232CB616191E00CD00EF39FC /* NativeBreakpoint.h in Headers */,
 				947A1D651616476B0017C8D1 /* CommandObjectPlugin.h in Headers */,
 				262ED0051631FA2800879631 /* OptionGroupString.h in Headers */,
 				26474CA918D0CB070073DEBA /* RegisterContextFreeBSD_i386.h in Headers */,
@@ -4780,13 +4815,17 @@
 				268900F913353E6F00698AC0 /* Thread.cpp in Sources */,
 				268900FA13353E6F00698AC0 /* ThreadList.cpp in Sources */,
 				268900FB13353E6F00698AC0 /* ThreadPlan.cpp in Sources */,
+				232CB619191E00CD00EF39FC /* NativeProcessProtocol.cpp in Sources */,
 				268900FC13353E6F00698AC0 /* ThreadPlanBase.cpp in Sources */,
 				268900FD13353E6F00698AC0 /* ThreadPlanCallFunction.cpp in Sources */,
 				268900FE13353E6F00698AC0 /* ThreadPlanCallUserExpression.cpp in Sources */,
 				268900FF13353E6F00698AC0 /* ThreadPlanShouldStopHere.cpp in Sources */,
 				2689010013353E6F00698AC0 /* ThreadPlanStepInstruction.cpp in Sources */,
+				232CB61B191E00CD00EF39FC /* NativeThreadProtocol.cpp in Sources */,
 				2689010113353E6F00698AC0 /* ThreadPlanStepOut.cpp in Sources */,
 				2689010213353E6F00698AC0 /* ThreadPlanStepOverBreakpoint.cpp in Sources */,
+				232CB617191E00CD00EF39FC /* NativeBreakpointList.cpp in Sources */,
+				232CB615191E00CD00EF39FC /* NativeBreakpoint.cpp in Sources */,
 				2689010313353E6F00698AC0 /* ThreadPlanStepRange.cpp in Sources */,
 				2689010413353E6F00698AC0 /* ThreadPlanStepInRange.cpp in Sources */,
 				2689010513353E6F00698AC0 /* ThreadPlanStepOverRange.cpp in Sources */,
@@ -4845,6 +4884,7 @@
 				26DB3E191379E7AD0080DC73 /* ABIMacOSX_arm64.cpp in Sources */,
 				26DB3E1C1379E7AD0080DC73 /* ABIMacOSX_i386.cpp in Sources */,
 				26DB3E1F1379E7AD0080DC73 /* ABISysV_x86_64.cpp in Sources */,
+				232CB61D191E00CD00EF39FC /* SoftwareBreakpoint.cpp in Sources */,
 				26D1803E16CEBFD300EDFB5B /* KQueue.cpp in Sources */,
 				26A69C5F137A17A500262477 /* RegisterValue.cpp in Sources */,
 				2690B3711381D5C300ECFBAE /* Memory.cpp in Sources */,
