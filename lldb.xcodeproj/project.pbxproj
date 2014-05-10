@@ -7,6 +7,18 @@
 	objects = {
 
 /* Begin PBXAggregateTarget section */
+		232CB5F7191C9DCC00EF39FC /* MacOSX and Linux */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = 232CB5F8191C9DCC00EF39FC /* Build configuration list for PBXAggregateTarget "MacOSX and Linux" */;
+			buildPhases = (
+			);
+			dependencies = (
+				232CB5FE191C9DEF00EF39FC /* PBXTargetDependency */,
+				232CB600191C9DF600EF39FC /* PBXTargetDependency */,
+			);
+			name = "MacOSX and Linux";
+			productName = "MacOSX and Linux";
+		};
 		26CEF3A914FD58BF007286B2 /* desktop_no_xpc */ = {
 			isa = PBXAggregateTarget;
 			buildConfigurationList = 26CEF3AD14FD58BF007286B2 /* Build configuration list for PBXAggregateTarget "desktop_no_xpc" */;
