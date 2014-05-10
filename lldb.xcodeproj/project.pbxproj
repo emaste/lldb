@@ -716,6 +716,20 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		232CB5FD191C9DEF00EF39FC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 08FB7793FE84155DC02AAC07 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 26F5C26910F3D9A4009D5894;
+			remoteInfo = "lldb-tool";
+		};
+		232CB5FF191C9DF600EF39FC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 08FB7793FE84155DC02AAC07 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 232CB5F1191C99E500EF39FC;
+			remoteInfo = linux;
+		};
 		262CFC7111A450CB00946C6C /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 265E9BE1115C2BAA00D0DCCB /* debugserver.xcodeproj */;
@@ -4085,6 +4099,20 @@
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXLegacyTarget section */
+		232CB5F1191C99E500EF39FC /* linux */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "-u /Users/tfiala/lldb/tools/scripts/lldb_osx_make_linux.py -x $(ACTION)";
+			buildConfigurationList = 232CB5F6191C99E500EF39FC /* Build configuration list for PBXLegacyTarget "linux" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/bin/python;
+			buildWorkingDirectory = /Users/tfiala/lldb/git/s01/lldb;
+			dependencies = (
+			);
+			name = linux;
+			passBuildSettingsInEnvironment = 1;
+			productName = linux;
+		};
 		2687EAC51508110B00DD8C2E /* install-headers */ = {
 			isa = PBXLegacyTarget;
 			buildArgumentsString = "$(ACTION)";
@@ -4285,6 +4313,8 @@
 				EDC6D49814E5C19B001B75F8 /* launcherXPCService */,
 				EDE274E214EDCE1F005B0F75 /* launcherRootXPCService */,
 				2687EAC51508110B00DD8C2E /* install-headers */,
+				232CB5F1191C99E500EF39FC /* linux */,
+				232CB5F7191C9DCC00EF39FC /* MacOSX and Linux */,
 			);
 		};
 /* End PBXProject section */
@@ -4957,6 +4987,16 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		232CB5FE191C9DEF00EF39FC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 26F5C26910F3D9A4009D5894 /* lldb-tool */;
+			targetProxy = 232CB5FD191C9DEF00EF39FC /* PBXContainerItemProxy */;
+		};
+		232CB600191C9DF600EF39FC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 232CB5F1191C99E500EF39FC /* linux */;
+			targetProxy = 232CB5FF191C9DF600EF39FC /* PBXContainerItemProxy */;
+		};
 		262CFC7211A450CB00946C6C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = debugserver;
@@ -5169,6 +5209,154 @@
 				WARNING_CFLAGS = "-Wreorder";
 			};
 			name = Release;
+		};
+		232CB5F2191C99E500EF39FC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				DEBUGGING_SYMBOLS = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		232CB5F3191C99E500EF39FC /* DebugClang */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				DEBUGGING_SYMBOLS = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+			};
+			name = DebugClang;
+		};
+		232CB5F4191C99E500EF39FC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		232CB5F5191C99E500EF39FC /* BuildAndIntegration */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+			};
+			name = BuildAndIntegration;
+		};
+		232CB5F9191C9DCC00EF39FC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		232CB5FA191C9DCC00EF39FC /* DebugClang */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = DebugClang;
+		};
+		232CB5FB191C9DCC00EF39FC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		232CB5FC191C9DCC00EF39FC /* BuildAndIntegration */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = BuildAndIntegration;
 		};
 		26579F6A126A25920007C5CB /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -6891,6 +7079,28 @@
 				49BB8F341611172B00BDD462 /* DebugClang */,
 				1DEB91F108733DB70010E9CD /* Release */,
 				268A89B211963ECA00D953EB /* BuildAndIntegration */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = BuildAndIntegration;
+		};
+		232CB5F6191C99E500EF39FC /* Build configuration list for PBXLegacyTarget "linux" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				232CB5F2191C99E500EF39FC /* Debug */,
+				232CB5F3191C99E500EF39FC /* DebugClang */,
+				232CB5F4191C99E500EF39FC /* Release */,
+				232CB5F5191C99E500EF39FC /* BuildAndIntegration */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = BuildAndIntegration;
+		};
+		232CB5F8191C9DCC00EF39FC /* Build configuration list for PBXAggregateTarget "MacOSX and Linux" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				232CB5F9191C9DCC00EF39FC /* Debug */,
+				232CB5FA191C9DCC00EF39FC /* DebugClang */,
+				232CB5FB191C9DCC00EF39FC /* Release */,
+				232CB5FC191C9DCC00EF39FC /* BuildAndIntegration */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = BuildAndIntegration;
