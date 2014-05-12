@@ -315,6 +315,9 @@ protected:
     Handle_QSetSTDERR (StringExtractorGDBRemote &packet);
 
     PacketResult
+    Handle_c (StringExtractorGDBRemote &packet, bool skip_file_pos_adjustment = false);
+
+    PacketResult
     Handle_vCont (StringExtractorGDBRemote &packet);
 
     PacketResult

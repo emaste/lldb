@@ -246,6 +246,10 @@ GDBRemoteCommunicationServer::GetPacketAndSendResponse (uint32_t timeout_usec,
             packet_result = Handle_qPlatform_shell (packet);
             break;
 
+        case StringExtractorGDBRemote::eServerPacketType_c:
+            packet_result = Handle_c (packet);
+            break;
+
         case StringExtractorGDBRemote::eServerPacketType_vCont:
             packet_result = Handle_vCont (packet);
             break;
@@ -1742,6 +1746,63 @@ GDBRemoteCommunicationServer::Handle_QSetSTDERR (StringExtractorGDBRemote &packe
 }
 
 GDBRemoteCommunication::PacketResult
+GDBRemoteCommunicationServer::Handle_c (StringExtractorGDBRemote &packet, bool skip_file_pos_adjustment)
+{
+    if (!IsGdbServer ())
+    {
+        // only llgs supports $vCont
+        return SendUnimplementedResponse (packet.GetStringRef().c_str());
+    }
+
+    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
+    if (log)
+        log->Printf ("GDBRemoteCommunicationServer::%s handling c packet", __FUNCTION__);
+
+    // We reuse this method in vCont - don't double adjust the file position.
+    if (!skip_file_pos_adjustment)
+        packet.SetFilePos (::strlen ("c"));
+
+    // For now just support all continue.
+    const bool has_continue_address = (packet.GetBytesLeft () > 0);
+    if (has_continue_address)
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s not implemented for c{address} variant [%s remains]", __FUNCTION__, packet.Peek ());
+        return SendUnimplementedResponse (packet.GetStringRef().c_str());
+    }
+
+    // Ensure we have a native process.
+    if (!m_debugged_process_sp)
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s no debugged process shared pointer", __FUNCTION__);
+        return SendErrorResponse (GDBRemoteServerError::eErrorNoProcess);
+    }
+
+    // Build the ResumeActionList
+    lldb_private::ResumeActionList actions (StateType::eStateRunning, 0);
+
+    Error error = m_debugged_process_sp->Resume (actions);
+    if (error.Fail ())
+    {
+        if (log)
+        {
+            log->Printf ("GDBRemoteCommunicationServer::%s c failed for process %" PRIu64 ": %s",
+                         __FUNCTION__,
+                         m_debugged_process_sp->GetID (),
+                         error.AsCString ());
+        }
+        return SendErrorResponse (GDBRemoteServerError::eErrorResume);
+    }
+
+    if (log)
+        log->Printf ("GDBRemoteCommunicationServer::%s continued process %" PRIu64, __FUNCTION__, m_debugged_process_sp->GetID ());
+
+    // No response required from continue.
+    return PacketResult::Success;
+}
+
+GDBRemoteCommunication::PacketResult
 GDBRemoteCommunicationServer::Handle_vCont_actions (StringExtractorGDBRemote &packet)
 {
     if (!IsGdbServer ())
@@ -1774,43 +1835,28 @@ GDBRemoteCommunicationServer::Handle_vCont (StringExtractorGDBRemote &packet)
     packet.SetFilePos (::strlen ("vCont"));
 
     // For now just support all continue.
-    const bool is_all_continue = !packet.GetBytesLeft () || (::strcmp (packet.Peek (), ";c") == 0);
-    if (!is_all_continue)
+    bool is_all_continue = false;
+
+    if (!packet.GetBytesLeft ())
+        is_all_continue = true;
+    else if (::strcmp (packet.Peek (), ";c") == 0)
     {
-        if (log)
-            log->Printf ("GDBRemoteCommunicationServer::%s not implemented for %s variant", __FUNCTION__, packet.GetStringRef ().c_str ());
-        return SendUnimplementedResponse (packet.GetStringRef().c_str());
+        // Move the packet past the ";c".
+        is_all_continue = true;
+        packet.SetFilePos (packet.GetFilePos () + ::strlen (";c"));
     }
 
-    // Ensure we have a native process.
-    if (!m_debugged_process_sp)
+    if (is_all_continue)
     {
-        if (log)
-            log->Printf ("GDBRemoteCommunicationServer::%s no debugged process shared pointer", __FUNCTION__);
-        return SendErrorResponse (GDBRemoteServerError::eErrorNoProcess);
+        // Handle the simple all-continue case with the $c handler.
+        const bool skip_file_pos_adjustment = true;
+        return Handle_c (packet, skip_file_pos_adjustment);
     }
 
-    // Build the ResumeActionList
-    lldb_private::ResumeActionList actions (StateType::eStateRunning, 0);
-
-    Error error = m_debugged_process_sp->Resume (actions);
-    if (error.Fail ())
-    {
-        if (log)
-        {
-            log->Printf ("GDBRemoteCommunicationServer::%s vCont failed for process %" PRIu64 ": %s",
-                    __FUNCTION__,
-                    m_debugged_process_sp->GetID (),
-                    error.AsCString ());
-        }
-        return SendErrorResponse (GDBRemoteServerError::eErrorResume);
-    }
-
+    // FIXME handle vCont with per-thread actions specified.
     if (log)
-        log->Printf ("GDBRemoteCommunicationServer::%s continued process %" PRIu64, __FUNCTION__, m_debugged_process_sp->GetID ());
-
-    // No response required from continue.
-    return PacketResult::Success;
+        log->Printf ("GDBRemoteCommunicationServer::%s not implemented for %s variant", __FUNCTION__, packet.GetStringRef ().c_str ());
+    return SendUnimplementedResponse (packet.GetStringRef().c_str());
 }
 
 GDBRemoteCommunication::PacketResult

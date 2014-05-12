@@ -48,6 +48,7 @@ class LldbGdbServerTestCase(TestBase):
         self.debug_monitor_exe = get_debugserver_exe()
         if not self.debug_monitor_exe:
             self.skipTest("debugserver exe not found")
+        self.debug_monitor_extra_args = ""
 
     def create_socket(self):
         sock = socket.socket()
@@ -281,6 +282,36 @@ class LldbGdbServerTestCase(TestBase):
         self.init_llgs_test()
         self.buildDwarf()
         self.inferior_exit_42()
+
+    def c_packet_works(self):
+        server = self.start_server()
+        self.assertIsNotNone(server)
+
+        # build launch args
+        launch_args = [os.path.abspath('a.out')]
+
+        self.add_no_ack_remote_stream()
+        self.add_verified_launch_packets(launch_args)
+        self.test_sequence.add_log_lines(
+            ["read packet: $c#00",
+             "send packet: $W00#00"],
+            True)
+
+        self.expect_gdbremote_sequence()
+
+    @debugserver_test
+    @dsym_test
+    def test_c_packet_works_debugserver_dsym(self):
+        self.init_debugserver_test()
+        self.buildDsym()
+        self.c_packet_works()
+
+    @llgs_test
+    @dwarf_test
+    def test_c_packet_works_llgs_dwarf(self):
+        self.init_llgs_test()
+        self.buildDwarf()
+        self.c_packet_works()
 
     def inferior_print_exit(self):
         server = self.start_server()
