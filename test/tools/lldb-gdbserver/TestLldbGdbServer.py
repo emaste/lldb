@@ -324,10 +324,14 @@ class LldbGdbServerTestCase(TestBase):
         self.add_verified_launch_packets(launch_args)
         self.test_sequence.add_log_lines(
             ["read packet: $vCont;c#00",
-             "send packet: $O{}#00".format(gdbremote_hex_encode_string("hello, world\r\n")),
+            # The context collects and saves $O content, which can be spread out over multiple $O packets in a non-deterministic manner
+            # "send packet: $O{}#00".format(gdbremote_hex_encode_string("hello, world\r\n")),
              "send packet: $W00#00"],
             True)
-        self.expect_gdbremote_sequence()
+        context = self.expect_gdbremote_sequence()
+
+        self.assertTrue(context["O_count"] > 0)
+        self.assertEqual(context["O_content"], "hello, world\r\n")
 
     @debugserver_test
     @dsym_test
