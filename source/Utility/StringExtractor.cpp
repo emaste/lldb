@@ -419,13 +419,23 @@ StringExtractor::GetHexByteString (std::string &str)
 }
 
 size_t
+StringExtractor::GetHexByteStringFixedLength (std::string &str, uint32_t nibble_length)
+{
+    str.clear();
+
+    uint32_t nibble_count = 0;
+    for (const char *pch = Peek(); (nibble_count < nibble_length) && (pch != nullptr); str.append(1, GetHexU8(0, false)), pch = Peek (), nibble_count += 2)
+    {}
+
+    return str.size();
+}
+
+size_t
 StringExtractor::GetHexByteStringTerminatedBy (std::string &str,
                                                char terminator)
 {
     str.clear();
-#if 0
     char ch;
-    // I think this is totally wrong from what I would expect.
     while ((ch = GetHexU8(0,false)) != '\0')
         str.append(1, ch);
     if (Peek() && *Peek() == terminator)
@@ -433,11 +443,6 @@ StringExtractor::GetHexByteStringTerminatedBy (std::string &str,
 
     str.clear();
     return str.size();
-#else
-    for (const char *pch = Peek(); pch && *pch && (*pch != terminator); str.append(1, GetHexU8(0, false)), pch = Peek ())
-    {}
-    return str.size();
-#endif
 }
 
 bool

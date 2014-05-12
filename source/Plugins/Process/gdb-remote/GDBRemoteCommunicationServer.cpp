@@ -1271,11 +1271,11 @@ GDBRemoteCommunicationServer::Handle_A (StringExtractorGDBRemote &packet)
                         // back into a UTF8 string and make sure the length
                         // matches the one supplied in the packet
                         std::string arg;
-                        if (packet.GetHexByteStringTerminatedBy(arg, ',') != (arg_len / 2))
+                        if (packet.GetHexByteStringFixedLength(arg, arg_len) != (arg_len / 2))
                             success = false;
                         else
                         {
-                            // If there are any bytes lft
+                            // If there are any bytes left
                             if (packet.GetBytesLeft())
                             {
                                 if (packet.GetChar() != ',')
