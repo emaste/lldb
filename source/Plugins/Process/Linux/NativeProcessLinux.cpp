@@ -1278,7 +1278,6 @@ NativeProcessLinux::NativeProcessLinux () :
     m_arch (),
     m_operation_thread (LLDB_INVALID_HOST_THREAD),
     m_monitor_thread (LLDB_INVALID_HOST_THREAD),
-    m_terminal_fd (-1),
     m_operation (nullptr),
     m_operation_mutex (),
     m_operation_pending (),
@@ -1413,6 +1412,7 @@ NativeProcessLinux::~NativeProcessLinux()
 
 //------------------------------------------------------------------------------
 // Thread setup and tear down.
+
 void
 NativeProcessLinux::StartLaunchOpThread(LaunchArgs *args, Error &error)
 {

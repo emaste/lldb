@@ -35,7 +35,8 @@ NativeProcessProtocol::NativeProcessProtocol (lldb::pid_t pid) :
     m_exit_description (),
     m_delegates_mutex (Mutex::eMutexTypeRecursive),
     m_delegates (),
-    m_breakpoint_list ()
+    m_breakpoint_list (),
+    m_terminal_fd (-1)
 {
 }
 

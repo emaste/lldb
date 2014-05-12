@@ -117,19 +117,6 @@ namespace lldb_private
         void
         SetArchitecture (const ArchSpec &arch) { m_arch = arch; }
 
-        /// Returns a file descriptor to the controlling terminal of the inferior
-        /// process.
-        ///
-        /// Reads from this file descriptor yield both the standard output and
-        /// standard error of this debugee.  Even if stderr and stdout were
-        /// redirected on launch it may still happen that data is available on this
-        /// descriptor (if the inferior process opens /dev/tty, for example).
-        ///
-        /// If this monitor was attached to an existing process this method returns
-        /// -1.
-        int
-        GetTerminalFD() const { return m_terminal_fd; }
-
         /// Reads the contents from the register identified by the given (architecture
         /// dependent) offset.
         ///
@@ -269,7 +256,6 @@ namespace lldb_private
 
         lldb::thread_t m_operation_thread;
         lldb::thread_t m_monitor_thread;
-        int m_terminal_fd;
 
         // current operation which must be executed on the priviliged thread
         void *m_operation;

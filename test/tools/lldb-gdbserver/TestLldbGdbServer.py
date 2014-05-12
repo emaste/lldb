@@ -307,7 +307,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_inferior_print_exit_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()

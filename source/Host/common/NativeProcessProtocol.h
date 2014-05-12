@@ -203,6 +203,15 @@ namespace lldb_private
             return GetThreadByID (m_current_thread_id);
         }
 
+        //----------------------------------------------------------------------
+        // Access to inferior stdio
+        //----------------------------------------------------------------------
+        virtual
+        int GetTerminalFileDescriptor ()
+        {
+            return m_terminal_fd;
+        }
+
         // ---------------------------------------------------------------------
         // Callbacks for low-level process state changes
         // ---------------------------------------------------------------------
@@ -212,11 +221,11 @@ namespace lldb_private
             virtual
             ~NativeDelegate () {}
 
-            virtual
-            void InitializeDelegate (NativeProcessProtocol *process) = 0;
+            virtual void
+            InitializeDelegate (NativeProcessProtocol *process) = 0;
 
-            virtual
-            void ProcessStateChanged (NativeProcessProtocol *process, lldb::StateType state) = 0;
+            virtual void
+            ProcessStateChanged (NativeProcessProtocol *process, lldb::StateType state) = 0;
         };
 
         //------------------------------------------------------------------
@@ -266,6 +275,7 @@ namespace lldb_private
         Mutex m_delegates_mutex;
         std::vector<NativeDelegate*> m_delegates;
         NativeBreakpointList m_breakpoint_list;
+        int m_terminal_fd;
 
         void
         SynchronouslyNotifyProcessStateChanged (lldb::StateType state);

@@ -17,6 +17,7 @@
 // Other libraries and framework includes
 // Project includes
 #include "lldb/lldb-private-forward.h"
+#include "lldb/Core/Communication.h"
 #include "lldb/Host/Mutex.h"
 #include "lldb/Target/Process.h"
 #include "GDBRemoteCommunication.h"
@@ -197,8 +198,11 @@ public:
     //------------------------------------------------------------------
     // NativeProcessProtocol::NativeDelegate overrides
     //------------------------------------------------------------------
-    void InitializeDelegate (lldb_private::NativeProcessProtocol *process) override;
-    void ProcessStateChanged (lldb_private::NativeProcessProtocol *process, lldb::StateType state) override;
+    void
+    InitializeDelegate (lldb_private::NativeProcessProtocol *process) override;
+
+    void
+    ProcessStateChanged (lldb_private::NativeProcessProtocol *process, lldb::StateType state) override;
 
 protected:
     lldb::PlatformSP m_platform_sp;
@@ -215,6 +219,7 @@ protected:
     lldb_private::Mutex m_debugged_process_mutex;
     lldb_private::NativeProcessProtocolSP m_debugged_process_sp;
     lldb::DebuggerSP m_debugger_sp;
+    Communication m_stdio_communication;
 
     PacketResult
     SendUnimplementedResponse (const char *packet);
@@ -224,6 +229,9 @@ protected:
 
     PacketResult
     SendOKResponse ();
+
+    PacketResult
+    SendONotification (const char *buffer, uint32_t len);
 
     PacketResult
     SendWResponse (lldb_private::NativeProcessProtocol *process);
@@ -353,6 +361,12 @@ protected:
 
     void
     SetCurrentThreadID (lldb::tid_t tid);
+
+    lldb_private::Error
+    SetSTDIOFileDescriptor (int fd);
+
+    static void
+    STDIOReadThreadBytesReceived (void *baton, const void *src, size_t src_len);
 
 private:
     bool

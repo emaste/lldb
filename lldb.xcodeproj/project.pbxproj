@@ -914,6 +914,18 @@
 		232CB612191E00CC00EF39FC /* NativeThreadProtocol.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = NativeThreadProtocol.h; path = source/Host/common/NativeThreadProtocol.h; sourceTree = "<group>"; };
 		232CB613191E00CC00EF39FC /* SoftwareBreakpoint.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SoftwareBreakpoint.cpp; path = source/Host/common/SoftwareBreakpoint.cpp; sourceTree = "<group>"; };
 		232CB614191E00CD00EF39FC /* SoftwareBreakpoint.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SoftwareBreakpoint.h; path = source/Host/common/SoftwareBreakpoint.h; sourceTree = "<group>"; };
+		232CB62B19213AC200EF39FC /* NativeProcessLinux.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeProcessLinux.cpp; sourceTree = "<group>"; };
+		232CB62C19213AC200EF39FC /* NativeProcessLinux.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; path = NativeProcessLinux.h; sourceTree = "<group>"; };
+		232CB62D19213AC200EF39FC /* NativeThreadLinux.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeThreadLinux.cpp; sourceTree = "<group>"; };
+		232CB62E19213AC200EF39FC /* NativeThreadLinux.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeThreadLinux.h; sourceTree = "<group>"; };
+		232CB62F19215AD700EF39FC /* LinuxSignals.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = LinuxSignals.cpp; sourceTree = "<group>"; };
+		232CB63019215AD700EF39FC /* LinuxSignals.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LinuxSignals.h; sourceTree = "<group>"; };
+		232CB63119215AD700EF39FC /* LinuxThread.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = LinuxThread.cpp; sourceTree = "<group>"; };
+		232CB63219215AD700EF39FC /* LinuxThread.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LinuxThread.h; sourceTree = "<group>"; };
+		232CB63319215AD700EF39FC /* ProcessLinux.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ProcessLinux.cpp; sourceTree = "<group>"; };
+		232CB63419215AD700EF39FC /* ProcessLinux.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ProcessLinux.h; sourceTree = "<group>"; };
+		232CB63519215AD700EF39FC /* ProcessMonitor.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ProcessMonitor.cpp; sourceTree = "<group>"; };
+		232CB63619215AD700EF39FC /* ProcessMonitor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ProcessMonitor.h; sourceTree = "<group>"; };
 		260157C41885F4FF00F875CF /* libpanel.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libpanel.dylib; path = /usr/lib/libpanel.dylib; sourceTree = "<absolute>"; };
 		260223E7115F06D500A601A2 /* SBCommunication.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SBCommunication.h; path = include/lldb/API/SBCommunication.h; sourceTree = "<group>"; };
 		260223E8115F06E500A601A2 /* SBCommunication.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SBCommunication.cpp; path = source/API/SBCommunication.cpp; sourceTree = "<group>"; };
@@ -2184,6 +2196,25 @@
 			sourceTree = "<group>";
 			usesTabs = 0;
 		};
+		232CB62A19213A7A00EF39FC /* Linux */ = {
+			isa = PBXGroup;
+			children = (
+				232CB62F19215AD700EF39FC /* LinuxSignals.cpp */,
+				232CB63019215AD700EF39FC /* LinuxSignals.h */,
+				232CB63119215AD700EF39FC /* LinuxThread.cpp */,
+				232CB63219215AD700EF39FC /* LinuxThread.h */,
+				232CB63319215AD700EF39FC /* ProcessLinux.cpp */,
+				232CB63419215AD700EF39FC /* ProcessLinux.h */,
+				232CB63519215AD700EF39FC /* ProcessMonitor.cpp */,
+				232CB63619215AD700EF39FC /* ProcessMonitor.h */,
+				232CB62B19213AC200EF39FC /* NativeProcessLinux.cpp */,
+				232CB62C19213AC200EF39FC /* NativeProcessLinux.h */,
+				232CB62D19213AC200EF39FC /* NativeThreadLinux.cpp */,
+				232CB62E19213AC200EF39FC /* NativeThreadLinux.h */,
+			);
+			path = Linux;
+			sourceTree = "<group>";
+		};
 		260C897110F57C5600BB2B04 /* Plugins */ = {
 			isa = PBXGroup;
 			children = (
@@ -2296,6 +2327,7 @@
 		260C898A10F57C5600BB2B04 /* Process */ = {
 			isa = PBXGroup;
 			children = (
+				232CB62A19213A7A00EF39FC /* Linux */,
 				26BC179F18C7F4CB00D2196D /* elf-core */,
 				4CEE62F71145F1C70064CF93 /* GDB Remote */,
 				2642FBA713D003B400ED6808 /* MacOSX-Kernel */,

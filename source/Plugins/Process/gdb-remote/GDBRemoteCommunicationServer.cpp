@@ -74,7 +74,8 @@ GDBRemoteCommunicationServer::GDBRemoteCommunicationServer(bool is_platform) :
     m_current_tid (LLDB_INVALID_THREAD_ID),
     m_debugged_process_mutex (Mutex::eMutexTypeRecursive),
     m_debugged_process_sp (),
-    m_debugger_sp ()
+    m_debugger_sp (),
+    m_stdio_communication ("process.stdio")
 {
     assert(is_platform && "must be lldb-platform if debugger is not specified");
 }
@@ -95,7 +96,8 @@ GDBRemoteCommunicationServer::GDBRemoteCommunicationServer(bool is_platform,
     m_port_offset(0),
     m_debugged_process_mutex (Mutex::eMutexTypeRecursive),
     m_debugged_process_sp (),
-    m_debugger_sp (debugger_sp)
+    m_debugger_sp (debugger_sp),
+    m_stdio_communication ("process.stdio")
 {
     assert(platform_sp);
     assert((is_platform || debugger_sp) && "must specify non-NULL debugger_sp when lldb-gdbserver");
@@ -347,6 +349,8 @@ GDBRemoteCommunicationServer::LaunchProcess ()
 lldb_private::Error
 GDBRemoteCommunicationServer::LaunchDebugServerProcess ()
 {
+    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
+
     if (!m_process_launch_info.GetArguments ().GetArgumentCount ())
         return lldb_private::Error ("%s: no process command line specified to launch", __FUNCTION__);
 
@@ -364,6 +368,22 @@ GDBRemoteCommunicationServer::LaunchDebugServerProcess ()
     {
         fprintf (stderr, "%s: failed to launch executable %s", __FUNCTION__, m_process_launch_info.GetArguments ().GetArgumentAtIndex (0));
         return error;
+    }
+
+    // Setup stdout/stderr mapping from inferior.
+    auto terminal_fd = m_debugged_process_sp->GetTerminalFileDescriptor ();
+    if (terminal_fd >= 0)
+    {
+        if (log)
+            log->Printf ("ProcessGDBRemoteCommunicationServer::%s setting inferior STDIO fd to %d", __FUNCTION__, terminal_fd);
+        error = SetSTDIOFileDescriptor (terminal_fd);
+        if (error.Fail ())
+            return error;
+    }
+    else
+    {
+        if (log)
+            log->Printf ("ProcessGDBRemoteCommunicationServer::%s ignoring inferior STDIO since terminal fd reported as %d", __FUNCTION__, terminal_fd);
     }
 
     printf ("Launched '%s' as process %" PRIu64 "...\n", m_process_launch_info.GetArguments ().GetArgumentAtIndex (0), m_process_launch_info.GetProcessID ());
@@ -690,6 +710,55 @@ GDBRemoteCommunicationServer::ProcessStateChanged (lldb_private::NativeProcessPr
                     StateAsCString (state));
         }
     }
+}
+
+GDBRemoteCommunication::PacketResult
+GDBRemoteCommunicationServer::SendONotification (const char *buffer, uint32_t len)
+{
+    if ((buffer == nullptr) || (len == 0))
+    {
+        // Nothing to send.
+        return PacketResult::Success;
+    }
+
+    StreamString response;
+    response.PutChar ('O');
+    response.PutBytesAsRawHex8 (buffer, len);
+
+    return SendPacketNoLock (response.GetData (), response.GetSize ());
+}
+
+lldb_private::Error
+GDBRemoteCommunicationServer::SetSTDIOFileDescriptor (int fd)
+{
+    Error error;
+
+    // Set up the Read Thread for reading/handling process I/O
+    std::unique_ptr<ConnectionFileDescriptor> conn_up (new ConnectionFileDescriptor (fd, true));
+    if (!conn_up)
+    {
+        error.SetErrorString ("failed to create ConnectionFileDescriptor");
+        return error;
+    }
+
+    m_stdio_communication.SetConnection (conn_up.release());
+    if (!m_stdio_communication.IsConnected ())
+    {
+        error.SetErrorString ("failed to set connection for inferior I/O communication");
+        return error;
+    }
+
+    m_stdio_communication.SetReadThreadBytesReceivedCallback (STDIOReadThreadBytesReceived, this);
+    m_stdio_communication.StartReadThread();
+
+    return error;
+}
+
+void
+GDBRemoteCommunicationServer::STDIOReadThreadBytesReceived (void *baton, const void *src, size_t src_len)
+{
+    GDBRemoteCommunicationServer *server = reinterpret_cast<GDBRemoteCommunicationServer*> (baton);
+    static_cast<void> (server->SendONotification (static_cast<const char *>(src), src_len));
 }
 
 GDBRemoteCommunication::PacketResult
