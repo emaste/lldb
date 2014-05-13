@@ -196,6 +196,19 @@ public:
     LaunchProcess ();
 
     //------------------------------------------------------------------
+    /// Attach to a process.
+    ///
+    /// This method supports attaching llgs to a process accessible via the
+    /// configured Platform.
+    ///
+    /// @return
+    ///     An Error object indicating the success or failure of the
+    ///     attach operation.
+    //------------------------------------------------------------------
+    lldb_private::Error
+    AttachToProcess (lldb::pid_t pid);
+
+    //------------------------------------------------------------------
     // NativeProcessProtocol::NativeDelegate overrides
     //------------------------------------------------------------------
     void

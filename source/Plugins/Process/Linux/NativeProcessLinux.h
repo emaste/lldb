@@ -89,7 +89,7 @@ namespace lldb_private
             NativeProcessProtocolSP &native_process_sp);
 
         static lldb_private::Error
-        DoAttachToProcessWithID (
+        AttachToProcess (
             lldb::pid_t pid,
             lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
             NativeProcessProtocolSP &native_process_sp);

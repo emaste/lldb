@@ -1190,7 +1190,7 @@ NativeProcessLinux::LaunchProcess (
 }
 
 lldb_private::Error
-NativeProcessLinux::DoAttachToProcessWithID (
+NativeProcessLinux::AttachToProcess (
     lldb::pid_t pid,
     lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
     NativeProcessProtocolSP &native_process_sp)

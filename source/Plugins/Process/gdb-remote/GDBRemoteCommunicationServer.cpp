@@ -362,7 +362,7 @@ GDBRemoteCommunicationServer::LaunchDebugServerProcess ()
     {
         Mutex::Locker locker (m_debugged_process_mutex);
         assert (!m_debugged_process_sp && "lldb-gdbserver creating debugged process but one already exists");
-        error = m_platform_sp->LaunchDebugProcess (
+        error = m_platform_sp->LaunchNativeProcess (
             m_process_launch_info,
             *this,
             m_debugged_process_sp);
@@ -442,6 +442,65 @@ GDBRemoteCommunicationServer::LaunchPlatformProcess ()
     }
 
     return error;
+}
+
+lldb_private::Error
+GDBRemoteCommunicationServer::AttachToProcess (lldb::pid_t pid)
+{
+    Error error;
+
+    if (!IsGdbServer ())
+    {
+        error.SetErrorString("cannot AttachToProcess () unless process is lldb-gdbserver");
+        return error;
+    }
+
+    Log *log (GetLogIfAnyCategoriesSet (LIBLLDB_LOG_PROCESS));
+    if (log)
+        log->Printf ("GDBRemoteCommunicationServer::%s pid %" PRIu64, __FUNCTION__, pid);
+
+    // Scope for mutex locker.
+    {
+        // Before we try to attach, make sure we aren't already monitoring something else.
+        Mutex::Locker locker (m_spawned_pids_mutex);
+        if (!m_spawned_pids.empty ())
+        {
+            error.SetErrorStringWithFormat ("cannot attach to a process %" PRIu64 " when another process with pid %" PRIu64 " is being debugged.", pid, *m_spawned_pids.begin());
+            return error;
+        }
+
+        // Try to attach.
+        error = m_platform_sp->AttachNativeProcess (pid, *this, m_debugged_process_sp);
+        if (!error.Success ())
+        {
+            fprintf (stderr, "%s: failed to attach to process %" PRIu64 ": %s", __FUNCTION__, pid, error.AsCString ());
+            return error;
+        }
+
+        // Setup stdout/stderr mapping from inferior.
+        auto terminal_fd = m_debugged_process_sp->GetTerminalFileDescriptor ();
+        if (terminal_fd >= 0)
+        {
+            if (log)
+                log->Printf ("ProcessGDBRemoteCommunicationServer::%s setting inferior STDIO fd to %d", __FUNCTION__, terminal_fd);
+            error = SetSTDIOFileDescriptor (terminal_fd);
+            if (error.Fail ())
+                return error;
+        }
+        else
+        {
+            if (log)
+                log->Printf ("ProcessGDBRemoteCommunicationServer::%s ignoring inferior STDIO since terminal fd reported as %d", __FUNCTION__, terminal_fd);
+        }
+
+        printf ("Attached to process %" PRIu64 "...\n", pid);
+
+        // Add to list of spawned processes.
+        assert (m_spawned_pids.empty () && "lldb-gdbserver adding tracked process but one already existed");
+        m_spawned_pids.insert (pid);
+
+        return error;
+    }
 }
 
 void

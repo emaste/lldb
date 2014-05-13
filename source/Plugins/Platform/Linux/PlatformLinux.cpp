@@ -493,13 +493,13 @@ PlatformLinux::CalculateTrapHandlerSymbolNames ()
 }   
 
 Error
-PlatformLinux::LaunchDebugProcess (
+PlatformLinux::LaunchNativeProcess (
     ProcessLaunchInfo &launch_info,
     lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
     NativeProcessProtocolSP &process_sp)
 {
 #if !defined(__linux__)
-    return Error("not implemented on Non-Linux host");
+    return Error("only implemented on Linux hosts");
 #else
     if (!IsHost ())
         return Error("PlatformLinux::%s (): cannot launch a debug process when not the host", __FUNCTION__);
@@ -529,3 +529,20 @@ PlatformLinux::LaunchDebugProcess (
     return error;
 #endif
 }
+
+Error
+PlatformLinux::AttachNativeProcess (lldb::pid_t pid,
+                                    lldb_private::NativeProcessProtocol::NativeDelegate &native_delegate,
+                                    NativeProcessProtocolSP &process_sp)
+{
+#if !defined(__linux__)
+    return Error("only implemented on Linux hosts");
+#else
+    if (!IsHost ())
+        return Error("PlatformLinux::%s (): cannot attach to a debug process when not the host", __FUNCTION__);
+
+    // Launch it for debugging
+    return NativeProcessLinux::AttachToProcess (pid, native_delegate, process_sp);
+#endif
+}
+

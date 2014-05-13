@@ -177,9 +177,36 @@ setup_platform (const std::string platform_name)
 }
 
 void
-handle_attach (GDBRemoteCommunicationServer &gdb_server, const std::string &attach_target)
+handle_attach_to_pid (GDBRemoteCommunicationServer &gdb_server, lldb::pid_t pid)
+{
+    Error error = gdb_server.AttachToProcess (pid);
+    if (error.Fail ())
+    {
+        fprintf (stderr, "error: failed to attach to pid %" PRIu64 ": %s\n", pid, error.AsCString());
+        exit(1);
+    }
+}
+
+void
+handle_attach_to_process_name (GDBRemoteCommunicationServer &gdb_server, const std::string &process_name)
 {
     // FIXME implement.
+}
+
+void
+handle_attach (GDBRemoteCommunicationServer &gdb_server, const std::string &attach_target)
+{
+    assert (!attach_target.empty () && "attach_target cannot be empty");
+
+    // First check if the attach_target is convertable to a long. If so, we'll use it as a pid.
+    char *end_p = nullptr;
+    const long int pid = strtol (attach_target.c_str (), &end_p, 10);
+
+    // We'll call it a match if the entire argument is consumed.
+    if (end_p && static_cast<size_t> (end_p - attach_target.c_str ()) == attach_target.size ())
+        handle_attach_to_pid (gdb_server, static_cast<lldb::pid_t> (pid));
+    else
+        handle_attach_to_process_name (gdb_server, attach_target);
 }
 
 void
