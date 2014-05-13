@@ -1723,7 +1723,6 @@ NativeProcessLinux::Attach(AttachArgs *args)
     lldb::pid_t pid = args->m_pid;
 
     NativeProcessLinux *monitor = args->m_monitor;
-    // ProcessLinux &process = monitor->GetProcess();
     Listener &listener = monitor->GetListener ();
     lldb::ThreadSP inferior;
     Log *log (GetLogIfAllCategoriesSet (LIBLLDB_LOG_PROCESS));
@@ -1740,7 +1739,7 @@ NativeProcessLinux::Attach(AttachArgs *args)
     while (Host::FindProcessThreads(pid, tids_to_attach))
     {
         for (Host::TidMap::iterator it = tids_to_attach.begin();
-             it != tids_to_attach.end(); ++it)
+             it != tids_to_attach.end();)
         {
             if (it->second == false)
             {
@@ -1754,7 +1753,7 @@ NativeProcessLinux::Attach(AttachArgs *args)
                     // More error handling may be needed.
                     if (errno == ESRCH)
                     {
-                        tids_to_attach.erase(it);
+                        it = tids_to_attach.erase(it);
                         continue;
                     }
                     else
@@ -1773,7 +1772,7 @@ NativeProcessLinux::Attach(AttachArgs *args)
                     // More error handling may be needed.
                     if (errno == ESRCH)
                     {
-                        tids_to_attach.erase(it);
+                        it = tids_to_attach.erase(it);
                         continue;
                     }
                     else
@@ -1795,7 +1794,15 @@ NativeProcessLinux::Attach(AttachArgs *args)
 
                 listener.OnNewThread (tid);
                 it->second = true;
+
+                // Create the thread, mark it as stopped.
+                NativeThreadProtocolSP thread_sp (monitor->AddThread (static_cast<lldb::tid_t> (pid)));
+                assert (thread_sp && "AddThread() returned a nullptr");
+                reinterpret_cast<NativeThreadLinux*> (thread_sp.get ())->SetStoppedBySignal (SIGSTOP);
             }
+
+            // move the loop forward
+            ++it;
         }
     }
 
@@ -1804,6 +1811,7 @@ NativeProcessLinux::Attach(AttachArgs *args)
         monitor->m_pid = pid;
         // Let our process instance know the thread has stopped.
         listener.OnMessage (ProcessMessage::Trace(pid));
+        monitor->SetState (StateType::eStateStopped);
     }
     else
     {
