@@ -31,6 +31,7 @@ NativeProcessProtocol::NativeProcessProtocol (lldb::pid_t pid) :
     m_current_thread_id (LLDB_INVALID_THREAD_ID),
     m_threads_mutex (Mutex::eMutexTypeRecursive),
     m_state (lldb::eStateInvalid),
+    m_exit_type (eExitTypeInvalid),
     m_exit_status (0),
     m_exit_description (),
     m_delegates_mutex (Mutex::eMutexTypeRecursive),
@@ -41,10 +42,11 @@ NativeProcessProtocol::NativeProcessProtocol (lldb::pid_t pid) :
 }
 
 bool
-NativeProcessProtocol::GetExitStatus (int *status, std::string &exit_description)
+NativeProcessProtocol::GetExitStatus (ExitType *exit_type, int *status, std::string &exit_description)
 {
     if (m_state == lldb::eStateExited)
     {
+        *exit_type = m_exit_type;
         *status = m_exit_status;
         exit_description = m_exit_description;
         return true;
@@ -55,12 +57,13 @@ NativeProcessProtocol::GetExitStatus (int *status, std::string &exit_description
 }
 
 bool
-NativeProcessProtocol::SetExitStatus (int status, const char *exit_description, bool bNotifyStateChange)
+NativeProcessProtocol::SetExitStatus (ExitType exit_type, int status, const char *exit_description, bool bNotifyStateChange)
 {
     Log *log (lldb_private::GetLogIfAllCategoriesSet (LIBLLDB_LOG_PROCESS));
     if (log)
-        log->Printf ("NativeProcessProtocol::%s(%d, %s, %s) called",
+        log->Printf ("NativeProcessProtocol::%s(%d, %d, %s, %s) called",
                 __FUNCTION__,
+                exit_type,
                 status,
                 exit_description ? exit_description : "nullptr",
                 bNotifyStateChange ? "true" : "false");
@@ -75,6 +78,7 @@ NativeProcessProtocol::SetExitStatus (int status, const char *exit_description, 
 
     m_state = lldb::eStateExited;
 
+    m_exit_type = exit_type;
     m_exit_status = status;
     if (exit_description && exit_description[0])
         m_exit_description = exit_description;

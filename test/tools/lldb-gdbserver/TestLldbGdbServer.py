@@ -486,7 +486,7 @@ class LldbGdbServerTestCase(TestBase):
         server = self.start_server(attach_pid=inferior.pid)
         self.assertIsNotNone(server)
 
-        # Check that the stub reports attachment to the inferior.
+        # Setup expected gdbremote packet stream.
         self.add_no_ack_remote_stream()
         self.add_get_pid()
         self.test_sequence.add_log_lines(
@@ -529,14 +529,17 @@ class LldbGdbServerTestCase(TestBase):
         server = self.start_server(attach_pid=inferior.pid)
         self.assertIsNotNone(server)
 
-        # Check that the stub reports attachment to the inferior.
+        # Setup expected gdbremote packet stream.
         self.add_no_ack_remote_stream()
         self.add_get_pid()
         self.test_sequence.add_log_lines(
             ["read packet: $k#6b",
-             "send packet: $W09#00"],
+             "send packet: $X09#00"],
             True)
         self.expect_gdbremote_sequence()
+
+        # Wait a moment for completed and now-detached inferior process to clear.
+        time.sleep(1)
 
         # Process should be dead now.  Reap results.
         poll_result = inferior.poll()
@@ -554,7 +557,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_attach_commandline_kill_after_initial_stop_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()

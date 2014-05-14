@@ -171,10 +171,10 @@ namespace lldb_private
         // Exit Status
         //----------------------------------------------------------------------
         virtual bool
-        GetExitStatus (int *status, std::string &exit_description);
+        GetExitStatus (lldb_private::ExitType *exit_type, int *status, std::string &exit_description);
 
         virtual bool
-        SetExitStatus (int status, const char *exit_description, bool bNotifyStateChange);
+        SetExitStatus (lldb_private::ExitType exit_type, int status, const char *exit_description, bool bNotifyStateChange);
 
         //----------------------------------------------------------------------
         // Access to threads
@@ -270,6 +270,7 @@ namespace lldb_private
         lldb::tid_t m_current_thread_id;
         mutable Mutex m_threads_mutex;
         lldb::StateType m_state;
+        lldb_private::ExitType m_exit_type;
         int m_exit_status;
         std::string m_exit_description;
         Mutex m_delegates_mutex;

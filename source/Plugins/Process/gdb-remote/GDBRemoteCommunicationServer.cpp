@@ -532,10 +532,11 @@ GDBRemoteCommunicationServer::SendWResponse (lldb_private::NativeProcessProtocol
     Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
 
     // send W notification
-    int exit_status = 0;
+    ExitType exit_type = ExitType::eExitTypeInvalid;
+    int return_code = 0;
     std::string exit_description;
 
-    const bool got_exit_info = process->GetExitStatus (&exit_status, exit_description);
+    const bool got_exit_info = process->GetExitStatus (&exit_type, &return_code, exit_description);
     if (!got_exit_info)
     {
         if (log)
@@ -549,12 +550,22 @@ GDBRemoteCommunicationServer::SendWResponse (lldb_private::NativeProcessProtocol
     else
     {
         if (log)
-            log->Printf ("GDBRemoteCommunicationServer::%s pid %" PRIu64 ", returning exit status %d [%s]", __FUNCTION__, process->GetID (), exit_status, exit_description.c_str ());
+            log->Printf ("GDBRemoteCommunicationServer::%s pid %" PRIu64 ", returning exit type %d, return code %d [%s]", __FUNCTION__, process->GetID (), exit_type, return_code, exit_description.c_str ());
 
         StreamGDBRemote response;
-        response.PutChar ('W');
+
+        char return_type_code = 'E';
+        switch (exit_type)
+        {
+            case ExitType::eExitTypeExit:   return_type_code = 'W'; break;
+            case ExitType::eExitTypeSignal: return_type_code = 'X'; break;
+            case ExitType::eExitTypeStop:   return_type_code = 'S'; break;
+        }
+        response.PutChar (return_type_code);
+
         // POSIX exit status limited to unsigned 8 bits.
-        response.PutHex8 (exit_status);
+        response.PutHex8 (return_code);
+
         return SendPacketNoLock(response.GetData(), response.GetSize());
     }
 }
@@ -2330,49 +2341,7 @@ GDBRemoteCommunicationServer::Handle_stop_reason (StringExtractorGDBRemote &pack
         case eStateInvalid:
         case eStateUnloaded:
         case eStateExited:
-            {
-                int exit_status = 0;
-                std::string exit_description;
-
-                if (m_debugged_process_sp->GetExitStatus (&exit_status, exit_description))
-                {
-                    // Process exited with exit status
-                    StreamGDBRemote response;
-                    response.PutChar ('W');
-                    // POSIX exit status limited to unsigned 8 bits.
-                    response.PutHex8 (exit_status);
-                    if (!exit_description.empty ())
-                    {
-                        response.PutCStringAsRawHex8 ("description");
-                        response.PutChar (':');
-                        response.PutCStringAsRawHex8 (exit_description.c_str ());
-                        response.PutChar (';');
-                    }
-                    return SendPacketNoLock(response.GetData(), response.GetSize());
-                }
-                else
-                {
-                    // FIXME handle exit from signal ($X)
-                    // FIXME handle exit in stopped state (?? debugserver's S exit here - unloaded maybe?).
-                    if (log)
-                    {
-                        log->Printf ("GDBRemoteCommunicationServer::%s pid %" PRIu64 " don't have enough info for a good stop reason, state: %s",
-                                __FUNCTION__,
-                                m_debugged_process_sp->GetID (),
-                                StateAsCString (process_state));
-                    }
-
-                    StreamGDBRemote response;
-                    response.PutCString ("W00;");
-                    response.PutCStringAsRawHex8 ("description");
-                    response.PutChar (':');
-                    response.PutCStringAsRawHex8 ("process in state ");
-                    response.PutCStringAsRawHex8 (StateAsCString (process_state));
-                    response.PutChar (';');
-                    return SendPacketNoLock(response.GetData(), response.GetSize());
-                }
-            }
-            break;
+                return SendWResponse(m_debugged_process_sp.get());
 
     default:
         if (log)

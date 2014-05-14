@@ -1844,6 +1844,37 @@ NativeProcessLinux::SetDefaultPtraceOpts(lldb::pid_t pid)
     return PTRACE(PTRACE_SETOPTIONS, pid, NULL, (void*)ptrace_opts, 0) >= 0;
 }
 
+static ExitType convert_pid_status_to_exit_type (int status)
+{
+    if (WIFEXITED (status))
+        return ExitType::eExitTypeExit;
+    else if (WIFSIGNALED (status))
+        return ExitType::eExitTypeSignal;
+    else if (WIFSTOPPED (status))
+        return ExitType::eExitTypeStop;
+    else
+    {
+        // We don't know what this is.
+        return ExitType::eExitTypeInvalid;
+    }
+}
+
+static int convert_pid_status_to_return_code (int status)
+{
+    if (WIFEXITED (status))
+        return WEXITSTATUS (status);
+    else if (WIFSIGNALED (status))
+        return WTERMSIG (status);
+    else if (WIFSTOPPED (status))
+        return WSTOPSIG (status);
+    else
+    {
+        // We don't know what this is.
+        return ExitType::eExitTypeInvalid;
+    }
+}
+
+
 bool
 NativeProcessLinux::MonitorCallback(void *callback_baton,
                                 lldb::pid_t pid,
@@ -1867,7 +1898,7 @@ NativeProcessLinux::MonitorCallback(void *callback_baton,
             log->Printf ("NativeProcessLinux::%s() got exit signal, tid = %"  PRIu64, __FUNCTION__, pid);
         message = ProcessMessage::Exit(pid, status);
         listener.OnMessage (message);
-        monitor->SetExitStatus (status, nullptr, true);
+        monitor->SetExitStatus (convert_pid_status_to_exit_type (status), convert_pid_status_to_return_code (status), nullptr, true);
         return pid == monitor->GetID ();
     }
 
@@ -1893,7 +1924,7 @@ NativeProcessLinux::MonitorCallback(void *callback_baton,
             {
                 message = ProcessMessage::Exit(pid, status);
                 listener.OnMessage (message);
-                monitor->SetExitStatus (status, nullptr, true);
+                monitor->SetExitStatus (convert_pid_status_to_exit_type (status), convert_pid_status_to_return_code (status), nullptr, true);
             }
         }
     }
@@ -1969,8 +2000,10 @@ NativeProcessLinux::MonitorSIGTRAP(NativeProcessLinux *monitor,
         const bool is_main_thread = (pid == monitor->GetID ());
         if (log)
         {
-            log->Printf ("NativeProcessLinux::%s() received PTRACE_EVENT_EXIT, data = %lx, pid = %" PRIu64 " (%s)", 
-                    __FUNCTION__, data, pid,
+            log->Printf ("NativeProcessLinux::%s() received PTRACE_EVENT_EXIT, data = %lx (WIFEXITED=%s,WIFSIGNALED=%s), pid = %" PRIu64 " (%s)",
+                         __FUNCTION__,
+                         data, WIFEXITED (data) ? "true" : "false", WIFSIGNALED (data) ? "true" : "false",
+                         pid,
                     is_main_thread ? "is main thread" : "not main thread");
         }
 
@@ -1993,7 +2026,7 @@ NativeProcessLinux::MonitorSIGTRAP(NativeProcessLinux *monitor,
 
         message = ProcessMessage::Limbo(pid, (data >> 8));
         if (is_main_thread)
-            monitor->SetExitStatus (data >> 8, nullptr, true);
+            monitor->SetExitStatus (convert_pid_status_to_exit_type (data), convert_pid_status_to_return_code (data), nullptr, true);
 
         break;
     }
@@ -2283,12 +2316,23 @@ NativeProcessLinux::Signal (int signo)
 Error
 NativeProcessLinux::Kill ()
 {
+    Log *log (GetLogIfAllCategoriesSet (LIBLLDB_LOG_PROCESS));
+    if (log)
+        log->Printf ("NativeProcessLinux::%s called for PID %" PRIu64, __FUNCTION__, GetID ());
+
     Error error;
 
-    // FIXME check if we've already exited
-    const bool has_exited = false;
-    if (has_exited)
-        return error;
+    switch (m_state)
+    {
+        case StateType::eStateInvalid:
+        case StateType::eStateExited:
+        case StateType::eStateCrashed:
+        case StateType::eStateDetached:
+            // Nothing to do - the process is already dead.
+            if (log)
+                log->Printf ("NativeProcessLinux::%s ignored for PID %" PRIu64 " due to current state: %s", __FUNCTION__, GetID (), StateAsCString (m_state));
+            return error;
+    }
 
     if (kill (GetID (), SIGKILL) != 0)
     {
