@@ -233,6 +233,7 @@ protected:
     lldb_private::NativeProcessProtocolSP m_debugged_process_sp;
     lldb::DebuggerSP m_debugger_sp;
     Communication m_stdio_communication;
+    bool m_exit_now; // use in asynchronous handling to indicate process should exit.
 
     PacketResult
     SendUnimplementedResponse (const char *packet);
@@ -421,6 +422,9 @@ private:
     /// Launch a process from lldb-platform
     lldb_private::Error
     LaunchPlatformProcess ();
+
+    void
+    HandleInferiorState_Exited (lldb_private::NativeProcessProtocol *process);
 
     //------------------------------------------------------------------
     // For GDBRemoteCommunicationServer only

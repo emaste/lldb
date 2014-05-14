@@ -495,6 +495,9 @@ class LldbGdbServerTestCase(TestBase):
             True)
         self.expect_gdbremote_sequence()
 
+        # Wait a moment for completed and now-detached inferior process to clear.
+        time.sleep(1)
+
         # Process should be dead now.  Reap results.
         poll_result = inferior.poll()
         self.assertIsNotNone(poll_result)
@@ -511,7 +514,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_attach_commandline_continue_app_exits_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()

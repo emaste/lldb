@@ -2290,9 +2290,6 @@ NativeProcessLinux::Kill ()
     if (has_exited)
         return error;
 
-    // Drive the exit event to completion (do not keep the inferior in limbo).
-    // m_exit_now = true;
-
     if (kill (GetID (), SIGKILL) != 0)
     {
         error.SetErrorToErrno ();

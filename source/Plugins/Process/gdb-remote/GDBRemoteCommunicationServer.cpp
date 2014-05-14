@@ -75,7 +75,8 @@ GDBRemoteCommunicationServer::GDBRemoteCommunicationServer(bool is_platform) :
     m_debugged_process_mutex (Mutex::eMutexTypeRecursive),
     m_debugged_process_sp (),
     m_debugger_sp (),
-    m_stdio_communication ("process.stdio")
+    m_stdio_communication ("process.stdio"),
+    m_exit_now (false)
 {
     assert(is_platform && "must be lldb-platform if debugger is not specified");
 }
@@ -97,7 +98,8 @@ GDBRemoteCommunicationServer::GDBRemoteCommunicationServer(bool is_platform,
     m_debugged_process_mutex (Mutex::eMutexTypeRecursive),
     m_debugged_process_sp (),
     m_debugger_sp (debugger_sp),
-    m_stdio_communication ("process.stdio")
+    m_stdio_communication ("process.stdio"),
+    m_exit_now (false)
 {
     assert(platform_sp);
     assert((is_platform || debugger_sp) && "must specify non-NULL debugger_sp when lldb-gdbserver");
@@ -172,6 +174,7 @@ GDBRemoteCommunicationServer::GetPacketAndSendResponse (uint32_t timeout_usec,
 
         case StringExtractorGDBRemote::eServerPacketType_k:
             packet_result = Handle_k (packet);
+            quit = true;
             break;
 
         case StringExtractorGDBRemote::eServerPacketType_qLaunchSuccess:
@@ -319,6 +322,11 @@ GDBRemoteCommunicationServer::GetPacketAndSendResponse (uint32_t timeout_usec,
             error.SetErrorString("timeout");
         }
     }
+
+    // Check if anything occurred that would force us to want to exit.
+    if (m_exit_now)
+        quit = true;
+
     return packet_result == PacketResult::Success;
 }
 
@@ -732,6 +740,61 @@ GDBRemoteCommunicationServer::SendStopReplyPacketForThread (lldb::tid_t tid)
 }
 
 void
+GDBRemoteCommunicationServer::HandleInferiorState_Exited (lldb_private::NativeProcessProtocol *process)
+{
+    assert (process && "process cannot be NULL");
+
+    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
+    if (log)
+        log->Printf ("GDBRemoteCommunicationServer::%s called", __FUNCTION__);
+
+    // Send the exit result.
+    PacketResult result = SendWResponse (process);
+    if (result != PacketResult::Success)
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s failed to send stop notification for PID %" PRIu64 ", state: eStateExited", __FUNCTION__, process->GetID ());
+    }
+
+    // Detach the process.
+    if (log)
+        log->Printf ("GDBRemoteCommunicationServer::%s detaching from PID %" PRIu64, __FUNCTION__, process->GetID ());
+
+    Error error = process->Detach ();
+
+    if (error.Fail ())
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s PID %" PRIu64 " detach failed: %s", __FUNCTION__, process->GetID (), error.AsCString ());
+    }
+
+    // Remove the process from the list of spawned pids.
+    {
+        Mutex::Locker locker (m_spawned_pids_mutex);
+        if (m_spawned_pids.erase (process->GetID ()) < 1)
+        {
+            if (log)
+                log->Printf ("GDBRemoteCommunicationServer::%s failed to remove PID %" PRIu64 " from the spawned pids list", __FUNCTION__, process->GetID ());
+
+        }
+    }
+
+    // FIXME can't do this yet - since process state propagation is currently
+    // synchronous, it is running off the NativeProcessProtocol's innards and
+    // will tear down the NPP while it still has code to execute.
+#if 0
+    // Clear the NativeProcessProtocol pointer.
+    {
+        Mutex::Locker locker (m_debugged_process_mutex);
+        m_debugged_process_sp.reset();
+    }
+#endif
+
+    // We are ready to exit the debug monitor.
+    m_exit_now = true;
+}
+
+void
 GDBRemoteCommunicationServer::ProcessStateChanged (lldb_private::NativeProcessProtocol *process, lldb::StateType state)
 {
     assert (process && "process cannot be NULL");
@@ -744,12 +807,10 @@ GDBRemoteCommunicationServer::ProcessStateChanged (lldb_private::NativeProcessPr
                 StateAsCString (state));
     }
 
-    PacketResult result = PacketResult::Success;
-
     switch (state)
     {
     case StateType::eStateExited:
-        result = SendWResponse (process);
+        HandleInferiorState_Exited (process);
         break;
 
     default:
@@ -761,17 +822,6 @@ GDBRemoteCommunicationServer::ProcessStateChanged (lldb_private::NativeProcessPr
                     StateAsCString (state));
         }
         break;
-    }
-
-    if (result != PacketResult::Success)
-    {
-        if (log)
-        {
-            log->Printf ("GDBRemoteCommunicationServer::%s failed to send stop notification for PID %" PRIu64 ", state: %s",
-                    __FUNCTION__,
-                    process->GetID (),
-                    StateAsCString (state));
-        }
     }
 }
 
