@@ -467,7 +467,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_attach_commandline_qProcessInfo_reports_pid_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()
