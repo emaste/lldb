@@ -1,7 +1,7 @@
 """
 Test lldb-gdbserver operation
 """
-
+import errno
 import unittest2
 import pexpect
 import socket
@@ -56,6 +56,8 @@ class LldbGdbServerTestCase(TestBase):
         sock = socket.socket()
         logger = self.logger
 
+        sock.connect(('localhost', self.port))
+
         def shutdown_socket():
             if sock:
                 try:
@@ -71,10 +73,9 @@ class LldbGdbServerTestCase(TestBase):
 
         self.addTearDownHook(shutdown_socket)
 
-        sock.connect(('localhost', self.port))
         return sock
 
-    def start_server(self, attach_pid=None):
+    def launch_debug_monitor(self, attach_pid=None):
         # Create the command line.
         commandline = "{}{} localhost:{}".format(self.debug_monitor_exe, self.debug_monitor_extra_args, self.port)
         if attach_pid:
@@ -87,6 +88,14 @@ class LldbGdbServerTestCase(TestBase):
         if self.TraceOn():
             server.logfile_read = sys.stdout
 
+        return server
+
+    def connect_to_debug_monitor(self, attach_pid=None):
+        server = self.launch_debug_monitor(attach_pid=attach_pid)
+
+        # Wait until we receive the server ready message before continuing.
+        server.expect_exact('Listening to port {} for a connection from localhost'.format(self.port))
+
         # Schedule debug monitor to be shut down during teardown.
         logger = self.logger
         def shutdown_debug_monitor():
@@ -94,16 +103,29 @@ class LldbGdbServerTestCase(TestBase):
                 server.close()
             except:
                 logger.warning("failed to close pexpect server for debug monitor: {}; ignoring".format(sys.exc_info()[0]))
-
         self.addTearDownHook(shutdown_debug_monitor)
 
-        # Wait until we receive the server ready message before continuing.
-        server.expect_exact('Listening to port {} for a connection from localhost'.format(self.port))
+        attempts = 0
+        MAX_ATTEMPTS = 20
 
-        # Create a socket to talk to the server
-        self.sock = self.create_socket()
+        while attempts < MAX_ATTEMPTS:
+            # Create a socket to talk to the server
+            try:
+                self.sock = self.create_socket()
+                return server
+            except socket.error as serr:
+                # We're only trying to handle connection refused
+                if serr.errno != errno.ECONNREFUSED:
+                    raise serr
 
-        return server
+                # Increment attempts.
+                print("connect to debug monitor on port %d failed, attempt #%d of %d" % (self.port, attempts + 1, MAX_ATTEMPTS))
+                attempts += 1
+
+                # And wait a second before next attempt.
+                time.sleep(1)
+
+        raise Exception("failed to create a socket to the launched debug monitor after %d tries" % attempts)
 
     def launch_process_for_attach(self,sleep_seconds=3):
         # We're going to start a child process that the debug monitor stub can later attach to.
@@ -145,15 +167,15 @@ class LldbGdbServerTestCase(TestBase):
     @debugserver_test
     def test_exe_starts_debugserver(self):
         self.init_debugserver_test()
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
 
     @llgs_test
     def test_exe_starts_llgs(self):
         self.init_llgs_test()
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
 
     def start_no_ack_mode(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         self.add_no_ack_remote_stream()
@@ -170,7 +192,7 @@ class LldbGdbServerTestCase(TestBase):
         self.start_no_ack_mode()
 
     def thread_suffix_supported(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         self.add_no_ack_remote_stream()
@@ -193,7 +215,7 @@ class LldbGdbServerTestCase(TestBase):
         self.thread_suffix_supported()
 
     def list_threads_in_stop_reply_supported(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         self.add_no_ack_remote_stream()
@@ -215,7 +237,7 @@ class LldbGdbServerTestCase(TestBase):
         self.list_threads_in_stop_reply_supported()
 
     def start_inferior(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         # build launch args
@@ -243,7 +265,7 @@ class LldbGdbServerTestCase(TestBase):
         self.start_inferior()
 
     def inferior_exit_0(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         # build launch args
@@ -273,7 +295,7 @@ class LldbGdbServerTestCase(TestBase):
         self.inferior_exit_0()
 
     def inferior_exit_42(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         RETVAL = 42
@@ -305,7 +327,7 @@ class LldbGdbServerTestCase(TestBase):
         self.inferior_exit_42()
 
     def c_packet_works(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         # build launch args
@@ -335,7 +357,7 @@ class LldbGdbServerTestCase(TestBase):
         self.c_packet_works()
 
     def inferior_print_exit(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         # build launch args
@@ -369,7 +391,7 @@ class LldbGdbServerTestCase(TestBase):
         self.inferior_print_exit()
 
     def first_launch_stop_reply_thread_matches_first_qC(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         # build launch args
@@ -400,7 +422,7 @@ class LldbGdbServerTestCase(TestBase):
         self.first_launch_stop_reply_thread_matches_first_qC()
 
     def qProcessInfo_returns_running_process(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         # Build launch args
@@ -448,7 +470,7 @@ class LldbGdbServerTestCase(TestBase):
         self.assertTrue(inferior.pid > 0)
         
         # Launch the debug monitor stub, attaching to the inferior.
-        server = self.start_server(attach_pid=inferior.pid)
+        server = self.connect_to_debug_monitor(attach_pid=inferior.pid)
         self.assertIsNotNone(server)
 
         # Check that the stub reports attachment to the inferior.
@@ -483,7 +505,7 @@ class LldbGdbServerTestCase(TestBase):
         self.assertTrue(inferior.pid > 0)
 
         # Launch the debug monitor stub, attaching to the inferior.
-        server = self.start_server(attach_pid=inferior.pid)
+        server = self.connect_to_debug_monitor(attach_pid=inferior.pid)
         self.assertIsNotNone(server)
 
         # Setup expected gdbremote packet stream.
@@ -526,7 +548,7 @@ class LldbGdbServerTestCase(TestBase):
         self.assertTrue(inferior.pid > 0)
 
         # Launch the debug monitor stub, attaching to the inferior.
-        server = self.start_server(attach_pid=inferior.pid)
+        server = self.connect_to_debug_monitor(attach_pid=inferior.pid)
         self.assertIsNotNone(server)
 
         # Setup expected gdbremote packet stream.

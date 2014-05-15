@@ -60,21 +60,38 @@ static struct option g_long_options[] =
 //----------------------------------------------------------------------
 // Watch for signals
 //----------------------------------------------------------------------
-int g_sigpipe_received = 0;
+static int g_sigpipe_received = 0;
+static int g_sighup_received_count = 0;
+
 void
 signal_handler(int signo)
 {
+    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
+
+    fprintf (stderr, "lldb-gdbserver:%s received signal %d\n", __FUNCTION__, signo);
+    if (log)
+        log->Printf ("lldb-gdbserver:%s received signal %d", __FUNCTION__, signo);
+
     switch (signo)
     {
     case SIGPIPE:
         g_sigpipe_received = 1;
         break;
     case SIGHUP:
+#if 1
+        ++g_sighup_received_count;
+
+        // For now, swallow SIGHUP.
+        if (log)
+            log->Printf ("lldb-gdbserver:%s swallowing SIGHUP (receive count=%d)", __FUNCTION__, g_sighup_received_count);
+        signal (SIGHUP, signal_handler);
+#else
         // Use SIGINT first, if that does not work, use SIGHUP as a last resort.
         // And we should not call exit() here because it results in the global destructors
         // to be invoked and wreaking havoc on the threads still running.
         Host::SystemLog(Host::eSystemLogWarning, "SIGHUP received, exiting lldb-gdbserver...\n");
         abort();
+#endif
         break;
     }
 }
@@ -287,7 +304,7 @@ start_listener (GDBRemoteCommunicationServer &gdb_server, const char *const host
             {
                 bool interrupt = false;
                 bool done = false;
-                while (!interrupt && !done)
+                while (!interrupt && !done && (g_sighup_received_count < 1))
                 {
                     if (!gdb_server.GetPacketAndSendResponse (UINT32_MAX, error, interrupt, done))
                         break;
@@ -318,9 +335,11 @@ start_listener (GDBRemoteCommunicationServer &gdb_server, const char *const host
 int
 main (int argc, char *argv[])
 {
-    const char *progname = argv[0];
+    // Setup signal handlers first thing.
     signal (SIGPIPE, signal_handler);
     signal (SIGHUP, signal_handler);
+
+    const char *progname = argv[0];
     int long_option_index = 0;
     StreamSP log_stream_sp;
     Args log_args;
