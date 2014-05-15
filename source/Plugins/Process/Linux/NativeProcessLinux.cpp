@@ -1152,6 +1152,13 @@ NativeProcessLinux::LaunchProcess (
         }
     }
 
+    if (!native_process_sp->RegisterNativeDelegate (native_delegate))
+    {
+        native_process_sp.reset ();
+        error.SetErrorStringWithFormat ("failed to register the native delegate");
+        return error;
+    }
+
     reinterpret_cast<NativeProcessLinux*> (native_process_sp.get ())->LaunchInferior (
             exe_module,
             launch_info.GetArguments ().GetConstArgumentVector (),
@@ -1167,14 +1174,6 @@ NativeProcessLinux::LaunchProcess (
         native_process_sp.reset ();
         if (log)
             log->Printf ("NativeProcessLinux::%s failed to launch process: %s", __FUNCTION__, error.AsCString ());
-        return error;
-    }
-
-    if (!native_process_sp->RegisterNativeDelegate (native_delegate))
-    {
-        native_process_sp.reset ();
-        // CONSIDER shut down the process monitor here?
-        error.SetErrorStringWithFormat ("failed to register the native delegate");
         return error;
     }
 
@@ -1212,17 +1211,18 @@ NativeProcessLinux::AttachToProcess (
         return error;
 
     native_process_sp.reset (new NativeProcessLinux ());
-    reinterpret_cast<NativeProcessLinux*> (native_process_sp.get ())->AttachToInferior (pid, error);
-    if (!error.Success ())
-    {
-        native_process_sp.reset ();
-        return error;
-    }
 
     if (!native_process_sp->RegisterNativeDelegate (native_delegate))
     {
         native_process_sp.reset (new NativeProcessLinux ());
         error.SetErrorStringWithFormat ("failed to register the native delegate");
+        return error;
+    }
+
+    reinterpret_cast<NativeProcessLinux*> (native_process_sp.get ())->AttachToInferior (pid, error);
+    if (!error.Success ())
+    {
+        native_process_sp.reset ();
         return error;
     }
 

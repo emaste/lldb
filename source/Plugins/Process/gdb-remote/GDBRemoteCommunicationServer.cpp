@@ -1705,8 +1705,11 @@ GDBRemoteCommunicationServer::Handle_k (StringExtractorGDBRemote &packet)
         }
     }
 
-    // TODO figure out how to shut down gracefully at this point
-    return SendOKResponse ();
+    FlushInferiorOutput ();
+
+    // No OK response for kill packet.
+    // return SendOKResponse ();
+    return PacketResult::Success;
 }
 
 GDBRemoteCommunication::PacketResult
@@ -2344,7 +2347,8 @@ GDBRemoteCommunicationServer::Handle_stop_reason (StringExtractorGDBRemote &pack
         case eStateInvalid:
         case eStateUnloaded:
         case eStateExited:
-                return SendWResponse(m_debugged_process_sp.get());
+            FlushInferiorOutput ();
+            return SendWResponse(m_debugged_process_sp.get());
 
     default:
         if (log)
@@ -2391,4 +2395,16 @@ GDBRemoteCommunicationServer::Handle_vFile_MD5 (StringExtractorGDBRemote &packet
     }
     return SendErrorResponse(25);
 }
+
+void
+GDBRemoteCommunicationServer::FlushInferiorOutput ()
+{
+    // If we're not monitoring an inferior's terminal, ignore this.
+    if (!m_stdio_communication.IsConnected())
+        return;
+
+    // FIXME implement a timeout on the join.
+    m_stdio_communication.JoinReadThread();
+}
+
 

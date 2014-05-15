@@ -426,6 +426,9 @@ private:
     void
     HandleInferiorState_Exited (lldb_private::NativeProcessProtocol *process);
 
+    void
+    FlushInferiorOutput ();
+
     //------------------------------------------------------------------
     // For GDBRemoteCommunicationServer only
     //------------------------------------------------------------------
