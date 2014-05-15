@@ -123,43 +123,6 @@ namespace
             return Error("failed to retrieve a valid architecture from the exe module");
     }
 
-    class LoggingListener: public NativeProcessLinux::Listener
-    {
-    public:
-        virtual void
-        OnMessage (const ProcessMessage &message)
-            {
-                printf ("LoggingListener::%s () called\n", __FUNCTION__);
-            }
-
-        virtual void
-        OnNewThread (lldb::pid_t tid)
-            {
-                printf ("LoggingListener::%s (tid=%" PRIu64 ") called\n", __FUNCTION__, tid);
-            }
-
-        virtual void
-        OnThreadStopped (lldb::pid_t tid)
-            {
-                printf ("LoggingListener::%s (tid=%" PRIu64 ") called\n", __FUNCTION__, tid);
-            }
-
-        virtual bool
-        HasThread (lldb::pid_t tid)
-            {
-                printf ("LoggingListener::%s (tid=%" PRIu64 ") called, returning true\n", __FUNCTION__, tid);
-                // FIXME If we need to keep this, this needs to be corrected.
-                return true;
-            }
-    };
-
-    LoggingListener&
-    GetSharedLoggingListener ()
-    {
-        static LoggingListener listener;
-        return listener;
-    }
-
     void
     DisplayBytes (lldb_private::StreamString &s, void *bytes, uint32_t count)
     {
@@ -1274,7 +1237,6 @@ NativeProcessLinux::GetFilePath (
 
 NativeProcessLinux::NativeProcessLinux () :
     NativeProcessProtocol (LLDB_INVALID_PROCESS_ID),
-    m_listener (&(GetSharedLoggingListener ())),
     m_arch (),
     m_operation_thread (LLDB_INVALID_HOST_THREAD),
     m_monitor_thread (LLDB_INVALID_HOST_THREAD),
@@ -1444,7 +1406,6 @@ NativeProcessLinux::Launch(LaunchArgs *args)
 {
     NativeProcessLinux *monitor = args->m_monitor;
     // ProcessLinux &process = monitor->GetProcess();
-    Listener &listener = monitor->GetListener ();
     const char **argv = args->m_argv;
     const char **envp = args->m_envp;
     const char *stdin_path = args->m_stdin_path;
@@ -1665,13 +1626,11 @@ NativeProcessLinux::Launch(LaunchArgs *args)
     if (log)
         log->Printf ("NativeProcessLinux::%s() adding pid = %" PRIu64, __FUNCTION__, pid);
 
-    listener.OnNewThread (pid);
     thread_sp = monitor->AddThread (static_cast<lldb::tid_t> (pid));
     assert (thread_sp && "AddThread() returned a nullptr thread");
     reinterpret_cast<NativeThreadLinux*> (thread_sp.get ())->SetStoppedBySignal (SIGSTOP);
 
     // Let our process instance know the thread has stopped.
-    listener.OnMessage (ProcessMessage::Trace(pid));
     monitor->SetState (StateType::eStateStopped);
 
 FINISH:
@@ -1723,7 +1682,6 @@ NativeProcessLinux::Attach(AttachArgs *args)
     lldb::pid_t pid = args->m_pid;
 
     NativeProcessLinux *monitor = args->m_monitor;
-    Listener &listener = monitor->GetListener ();
     lldb::ThreadSP inferior;
     Log *log (GetLogIfAllCategoriesSet (LIBLLDB_LOG_PROCESS));
 
@@ -1792,7 +1750,6 @@ NativeProcessLinux::Attach(AttachArgs *args)
                 if (log)
                     log->Printf ("NativeProcessLinux::%s() adding tid = %" PRIu64, __FUNCTION__, tid);
 
-                listener.OnNewThread (tid);
                 it->second = true;
 
                 // Create the thread, mark it as stopped.
@@ -1810,7 +1767,6 @@ NativeProcessLinux::Attach(AttachArgs *args)
     {
         monitor->m_pid = pid;
         // Let our process instance know the thread has stopped.
-        listener.OnMessage (ProcessMessage::Trace(pid));
         monitor->SetState (StateType::eStateStopped);
     }
     else
@@ -1884,7 +1840,6 @@ NativeProcessLinux::MonitorCallback(void *callback_baton,
 {
     ProcessMessage message;
     NativeProcessLinux *monitor = static_cast<NativeProcessLinux*>(callback_baton);
-    Listener &listener = monitor->GetListener ();
     bool stop_monitoring;
     siginfo_t info;
     int ptrace_err;
@@ -1897,7 +1852,6 @@ NativeProcessLinux::MonitorCallback(void *callback_baton,
         if (log)
             log->Printf ("NativeProcessLinux::%s() got exit signal, tid = %"  PRIu64, __FUNCTION__, pid);
         message = ProcessMessage::Exit(pid, status);
-        listener.OnMessage (message);
         monitor->SetExitStatus (convert_pid_status_to_exit_type (status), convert_pid_status_to_return_code (status), nullptr, true);
         return pid == monitor->GetID ();
     }
@@ -1923,7 +1877,6 @@ NativeProcessLinux::MonitorCallback(void *callback_baton,
             if (stop_monitoring)
             {
                 message = ProcessMessage::Exit(pid, status);
-                listener.OnMessage (message);
                 monitor->SetExitStatus (convert_pid_status_to_exit_type (status), convert_pid_status_to_return_code (status), nullptr, true);
             }
         }
@@ -1940,7 +1893,6 @@ NativeProcessLinux::MonitorCallback(void *callback_baton,
             break;
         }
 
-        listener.OnMessage (message);
         stop_monitoring = false;
     }
 
@@ -2009,7 +1961,9 @@ NativeProcessLinux::MonitorSIGTRAP(NativeProcessLinux *monitor,
 
         // Set the thread to exited.
         NativeThreadProtocolSP thread_sp = monitor->GetThreadByID (pid);
-        if (!thread_sp)
+        if (thread_sp)
+            reinterpret_cast<NativeThreadLinux*> (thread_sp.get ())->SetExited ();
+        else
         {
             if (log)
             {
@@ -2018,10 +1972,6 @@ NativeProcessLinux::MonitorSIGTRAP(NativeProcessLinux *monitor,
                         monitor->GetID (),
                         pid);
             }
-        }
-        else
-        {
-            reinterpret_cast<NativeThreadLinux*> (thread_sp.get ())->SetExited ();
         }
 
         message = ProcessMessage::Limbo(pid, (data >> 8));
@@ -2191,7 +2141,7 @@ NativeProcessLinux::WaitForInitialTIDStop(lldb::tid_t tid)
         // If this is a thread exit, we won't get any more information.
         if (WIFEXITED(status))
         {
-            m_listener->OnMessage (ProcessMessage::Exit(wait_pid, WEXITSTATUS(status)));
+            SetExitStatus (convert_pid_status_to_exit_type (status), convert_pid_status_to_return_code (status), nullptr, true);
             if (wait_pid == tid)
                 return true;
             continue;
@@ -2202,8 +2152,16 @@ NativeProcessLinux::WaitForInitialTIDStop(lldb::tid_t tid)
 
         if (log)
             log->Printf ("NativeProcessLinux::%s(bp) received thread stop signal", __FUNCTION__);
-        // CONSIDER manage this locally within NativeProcessLinux
-        m_listener->OnThreadStopped (wait_pid);
+
+        NativeThreadProtocolSP thread_sp = GetThreadByID (wait_pid);
+        if (thread_sp)
+            reinterpret_cast<NativeThreadLinux*> (thread_sp.get ())->SetExited ();
+        else
+        {
+            if (log)
+                log->Printf ("NativeProcessLinux::%s() pid %" PRIu64 " failed to retrieve thread for tid %" PRIu64 ", cannot set thread state", __FUNCTION__, GetID (), wait_pid);
+        }
+
         return true;
     }
     return false;
@@ -2521,7 +2479,7 @@ NativeProcessLinux::StopThread(lldb::tid_t tid)
         // If this is a thread exit, we won't get any more information.
         if (WIFEXITED(status))
         {
-            m_listener->OnMessage (ProcessMessage::Exit(wait_pid, WEXITSTATUS(status)));
+            SetExitStatus (convert_pid_status_to_exit_type (status), convert_pid_status_to_return_code (status), nullptr, true);
             if (wait_pid == tid)
                 return true;
             continue;
@@ -2561,22 +2519,24 @@ NativeProcessLinux::StopThread(lldb::tid_t tid)
         else
             message = MonitorSignal(this, &info, wait_pid);
 
-#if 1
-        const bool hasThread = m_listener->HasThread (wait_pid);
-#else
-        POSIXThread *thread = static_cast<POSIXThread*>(m_process->GetThreadList().FindThreadByID(wait_pid).get());
-#endif
+        // Lookup the thread.
+        NativeThreadLinux *const thread_p = nullptr;
+        NativeThreadProtocolSP thread_sp = GetThreadByID (wait_pid);
+        if (thread_sp)
+            reinterpret_cast<NativeThreadLinux*> (thread_sp.get ())->SetExited ();
+        else
+        {
+            if (log)
+                log->Printf ("NativeProcessLinux::%s() pid %" PRIu64 " failed to retrieve thread for tid %" PRIu64 ", cannot set thread state", __FUNCTION__, GetID (), wait_pid);
+        }
 
         // When a new thread is created, we may get a SIGSTOP for the new thread
         // just before we get the SIGTRAP that we use to add the thread to our
         // process thread list.  We don't need to worry about that signal here.
-        assert(hasThread || message.GetKind() == ProcessMessage::eSignalMessage);
+        assert(thread_p || message.GetKind() == ProcessMessage::eSignalMessage);
 
-        if (!hasThread)
-        {
-            m_listener->OnMessage (message);
+        if (!thread_p)
             continue;
-        }
 
         switch (message.GetKind())
         {
@@ -2593,8 +2553,10 @@ NativeProcessLinux::StopThread(lldb::tid_t tid)
             case ProcessMessage::eExitMessage:
                 if (log)
                     log->Printf ("NativeProcessLinux::%s(bp) handling message", __FUNCTION__);
+                // FIXME verify we don't need to do anything special here.
                 // SendMessage will set the thread state as needed.
-                m_listener->OnMessage (message);
+                // m_listener->OnMessage (message);
+
                 // If this is the thread we're waiting for, stop waiting. Even
                 // though this wasn't the signal we expected, it's the last
                 // signal we'll see while this thread is alive.
@@ -2607,12 +2569,14 @@ NativeProcessLinux::StopThread(lldb::tid_t tid)
                     log->Printf ("NativeProcessLinux::%s(bp) handling message", __FUNCTION__);
                 if (WSTOPSIG(status) == SIGSTOP)
                 {
-                    // CONSIDER handle this internally within NativeProcessLinux
-                    m_listener->OnThreadStopped (tid);
+                    // This should be handled already above.
+                    // m_listener->OnThreadStopped (tid);
                 }
                 else
                 {
-                    m_listener->OnMessage (message);
+                    // This should be handled already above.
+                    // m_listener->OnMessage (message);
+                    
                     // This isn't the stop we were expecting, but the thread is
                     // stopped. SendMessage will handle processing of this event,
                     // but we need to resume here to get the stop we are waiting
@@ -2629,7 +2593,7 @@ NativeProcessLinux::StopThread(lldb::tid_t tid)
                 {
                     if (log)
                         log->Printf ("NativeProcessLinux::%s(bp) received signal, done waiting", __FUNCTION__);
-                    m_listener->OnThreadStopped (tid);
+                    thread_p->SetStoppedBySignal (SIGSTOP);
                     return true;
                 }
                 // else fall-through
@@ -2640,8 +2604,14 @@ NativeProcessLinux::StopThread(lldb::tid_t tid)
             case ProcessMessage::eNewThreadMessage:
                 if (log)
                     log->Printf ("NativeProcessLinux::%s(bp) handling message", __FUNCTION__);
+
+                // FIXME figure out what we need to do here thread state wise.
+                // We're resuming immediately below for the wait_pid thread, but for the
+                // rest we should be setting the appropriate state above.
+
                 // SendMessage will set the thread state as needed.
-                m_listener->OnMessage (message);
+                // m_listener->OnMessage (message);
+
                 // This isn't the stop we were expecting, but the thread is
                 // stopped. SendMessage will handle processing of this event,
                 // but we need to resume here to get the stop we are waiting
@@ -2650,12 +2620,14 @@ NativeProcessLinux::StopThread(lldb::tid_t tid)
                 if (wait_pid == tid)
                     Resume(wait_pid, eResumeSignalNone);
                 break;
+
             case ProcessMessage::eExecMessage:
                 if (log)
                     log->Printf ("NativeProcessLinux::%s received eExecMessage for wait_pid = %" PRIu64 ", status = %d", __FUNCTION__, wait_pid, status);
-                // Pass along to event handler.
-                m_listener->OnMessage (message);
+
+                // Figure out what to do when the inferior execs.
                 break;
+
         default:
                 if (log)
                     log->Printf ("NativeProcessLinux::%s received unhandled message kind %u for wait_pid = %" PRIu64 ", status = %d", 

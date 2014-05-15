@@ -43,42 +43,6 @@ namespace lldb_private
     public:
 
         // ---------------------------------------------------------------------
-        // Public Types
-        // ---------------------------------------------------------------------
-
-        class Listener
-        {
-        public:
-            virtual ~Listener() {}
-
-            /// Tell the listener about a process-related event.
-            /// For a local process, ProcessPOSIX::SendMessage () would
-            /// handle this.
-            virtual void
-            OnMessage (const ProcessMessage &message) = 0;
-
-            /// Notify that a new thread (possibly the first thread of the
-            /// inferior process) is being tracked.  It might be in a
-            /// start-up state that is not entirely stable yet as far as
-            /// signals go.
-            virtual void
-            OnNewThread (lldb::pid_t tid) = 0;
-
-            /// Notify that a thread stopped, and might be doing part
-            /// of a Linux new thread startup maneuver where the main
-            /// process thread gets the SIGTRAP|PTRACE_EVENT_CLONE and the
-            /// child thread issues a stop (possibly this stop).
-            virtual void
-            OnThreadStopped (lldb::pid_t tid) = 0;
-
-            /// Query to find if a given thread exists for the process.
-            /// Returns true if the thread is known to the process metadata;
-            /// otherwise, returns false.
-            virtual bool
-            HasThread (lldb::pid_t tid) = 0;
-        };
-
-        // ---------------------------------------------------------------------
         // Public Static Methods
         // ---------------------------------------------------------------------
         static lldb_private::Error
@@ -104,10 +68,6 @@ namespace lldb_private
         {
             eResumeSignalNone = 0
         };
-
-        /// Return the listener associated with this NativeProcessLinux.
-        Listener&
-        GetListener () { return *m_listener; }
 
         /// Set the architecture for the process.  This is done only
         /// on attach. For a process started by the process monitor,
@@ -251,7 +211,6 @@ namespace lldb_private
         GetSoftwareBreakpointTrapOpcode (size_t trap_opcode_size_hint, size_t &actual_opcode_size, const uint8_t *&trap_opcode_bytes) override;
 
     private:
-        Listener *m_listener;
         lldb_private::ArchSpec m_arch;
 
         lldb::thread_t m_operation_thread;
