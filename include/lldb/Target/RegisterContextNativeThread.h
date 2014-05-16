@@ -15,7 +15,6 @@
 // Other libraries and framework includes
 // Project includes
 #include "lldb/lldb-private.h"
-// #include "lldb/Target/ExecutionContextScope.h"
 
 namespace lldb_private {
 
@@ -23,7 +22,6 @@ class NativeThreadProtocol;
 
 class RegisterContextNativeThread :
     public std::enable_shared_from_this<RegisterContext>
-    // , public ExecutionContextScope
 {
 public:
     //------------------------------------------------------------------
@@ -43,17 +41,20 @@ public:
     // virtual void
     // InvalidateAllRegisters () = 0;
 
-    virtual size_t
+    virtual uint32_t
     GetRegisterCount () = 0;
 
     virtual const RegisterInfo *
-    GetRegisterInfoAtIndex (uint32_t reg) = 0;
+    GetRegisterInfoAtIndex (uint32_t reg) const = 0;
 
-    virtual size_t
-    GetRegisterSetCount () = 0;
+    const char *
+    GetRegisterSetNameForRegisterAtIndex (uint32_t reg_index) const;
+
+    virtual uint32_t
+    GetRegisterSetCount () const = 0;
 
     virtual const RegisterSet *
-    GetRegisterSet (size_t reg_set) = 0;
+    GetRegisterSet (uint32_t reg_set) const = 0;
 
     virtual Error
     ReadRegister (const RegisterInfo *reg_info, RegisterValue &reg_value) = 0;

@@ -73,6 +73,8 @@
 		232CB61C191E00CD00EF39FC /* NativeThreadProtocol.h in Headers */ = {isa = PBXBuildFile; fileRef = 232CB612191E00CC00EF39FC /* NativeThreadProtocol.h */; };
 		232CB61D191E00CD00EF39FC /* SoftwareBreakpoint.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 232CB613191E00CC00EF39FC /* SoftwareBreakpoint.cpp */; };
 		232CB61E191E00CD00EF39FC /* SoftwareBreakpoint.h in Headers */ = {isa = PBXBuildFile; fileRef = 232CB614191E00CD00EF39FC /* SoftwareBreakpoint.h */; };
+		23EDE3321926843600F6A132 /* RegisterContextNativeThread.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 23EDE3311926843600F6A132 /* RegisterContextNativeThread.h */; };
+		23EDE33319269E7C00F6A132 /* RegisterContextNativeThread.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 23EDE3301926839700F6A132 /* RegisterContextNativeThread.cpp */; };
 		260157C61885F51C00F875CF /* libpanel.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 260157C41885F4FF00F875CF /* libpanel.dylib */; };
 		260157C71885F52500F875CF /* libpanel.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 260157C41885F4FF00F875CF /* libpanel.dylib */; };
 		260157C81885F53100F875CF /* libpanel.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 260157C41885F4FF00F875CF /* libpanel.dylib */; };
@@ -882,6 +884,7 @@
 			dstPath = "$(DEVELOPER_DIR)/usr/share/man/man1/";
 			dstSubfolderSpec = 0;
 			files = (
+				23EDE3321926843600F6A132 /* RegisterContextNativeThread.h in CopyFiles */,
 				AF90106515AB7D3600FF120D /* lldb.1 in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 1;
@@ -926,6 +929,8 @@
 		232CB63419215AD700EF39FC /* ProcessLinux.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ProcessLinux.h; sourceTree = "<group>"; };
 		232CB63519215AD700EF39FC /* ProcessMonitor.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ProcessMonitor.cpp; sourceTree = "<group>"; };
 		232CB63619215AD700EF39FC /* ProcessMonitor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ProcessMonitor.h; sourceTree = "<group>"; };
+		23EDE3301926839700F6A132 /* RegisterContextNativeThread.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RegisterContextNativeThread.cpp; path = source/Target/RegisterContextNativeThread.cpp; sourceTree = "<group>"; };
+		23EDE3311926843600F6A132 /* RegisterContextNativeThread.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = RegisterContextNativeThread.h; path = include/lldb/Target/RegisterContextNativeThread.h; sourceTree = "<group>"; };
 		260157C41885F4FF00F875CF /* libpanel.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libpanel.dylib; path = /usr/lib/libpanel.dylib; sourceTree = "<absolute>"; };
 		260223E7115F06D500A601A2 /* SBCommunication.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SBCommunication.h; path = include/lldb/API/SBCommunication.h; sourceTree = "<group>"; };
 		260223E8115F06E500A601A2 /* SBCommunication.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SBCommunication.cpp; path = source/API/SBCommunication.cpp; sourceTree = "<group>"; };
@@ -3495,6 +3500,8 @@
 		26BC7DEF10F1B80200F91463 /* Target */ = {
 			isa = PBXGroup;
 			children = (
+				23EDE3311926843600F6A132 /* RegisterContextNativeThread.h */,
+				23EDE3301926839700F6A132 /* RegisterContextNativeThread.cpp */,
 				497E7B331188ED300065CCA1 /* ABI.h */,
 				497E7B9D1188F6690065CCA1 /* ABI.cpp */,
 				4CB443BB1249920C00C13DC2 /* CPPLanguageRuntime.h */,
@@ -4672,6 +4679,7 @@
 				2689004313353E0400698AC0 /* Mangled.cpp in Sources */,
 				2689004413353E0400698AC0 /* Module.cpp in Sources */,
 				2689004513353E0400698AC0 /* ModuleChild.cpp in Sources */,
+				23EDE33319269E7C00F6A132 /* RegisterContextNativeThread.cpp in Sources */,
 				2689004613353E0400698AC0 /* ModuleList.cpp in Sources */,
 				2689004713353E0400698AC0 /* PluginManager.cpp in Sources */,
 				AF0C112818580CD800C4C45B /* QueueItem.cpp in Sources */,

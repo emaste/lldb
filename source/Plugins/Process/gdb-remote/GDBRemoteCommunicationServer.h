@@ -376,6 +376,9 @@ protected:
     PacketResult
     Handle_qPlatform_shell (StringExtractorGDBRemote &packet);
 
+    PacketResult
+    Handle_qRegisterInfo (StringExtractorGDBRemote &packet);
+
     void
     SetCurrentThreadID (lldb::tid_t tid);
 

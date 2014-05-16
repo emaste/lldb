@@ -69,14 +69,14 @@ RegisterContextNativeThread::GetRegisterInfoByName (const char *reg_name, uint32
         {
             const RegisterInfo * reg_info = GetRegisterInfoAtIndex(reg);
 
-            if ((reg_info->name != NULL && ::strcasecmp (reg_info->name, reg_name) == 0) ||
-                (reg_info->alt_name != NULL && ::strcasecmp (reg_info->alt_name, reg_name) == 0))
+            if ((reg_info->name != nullptr && ::strcasecmp (reg_info->name, reg_name) == 0) ||
+                (reg_info->alt_name != nullptr && ::strcasecmp (reg_info->alt_name, reg_name) == 0))
             {
                 return reg_info;
             }
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 const RegisterInfo *
@@ -84,7 +84,7 @@ RegisterContextNativeThread::GetRegisterInfo (uint32_t kind, uint32_t num)
 {
     const uint32_t reg_num = ConvertRegisterKindToRegisterNumber(kind, num);
     if (reg_num == LLDB_INVALID_REGNUM)
-        return NULL;
+        return nullptr;
     return GetRegisterInfoAtIndex (reg_num);
 }
 
@@ -94,7 +94,36 @@ RegisterContextNativeThread::GetRegisterName (uint32_t reg)
     const RegisterInfo * reg_info = GetRegisterInfoAtIndex(reg);
     if (reg_info)
         return reg_info->name;
-    return NULL;
+    return nullptr;
+}
+
+const char*
+RegisterContextNativeThread::GetRegisterSetNameForRegisterAtIndex (uint32_t reg_index) const
+{
+    const RegisterInfo *const reg_info = GetRegisterInfoAtIndex(reg_index);
+    if (!reg_info)
+        return nullptr;
+
+    for (uint32_t set_index = 0; set_index < GetRegisterSetCount (); ++set_index)
+    {
+        const RegisterSet *const reg_set = GetRegisterSet (set_index);
+        if (!reg_set)
+            continue;
+
+        for (uint32_t reg_num_index = 0; reg_num_index < reg_set->num_registers; ++reg_num_index)
+        {
+            const uint32_t reg_num = reg_set->registers[reg_num_index];
+            // FIXME double check we're checking the right register kind here.
+            if (reg_info->kinds[RegisterKind::eRegisterKindLLDB] == reg_num)
+            {
+                // The given register is a member of this register set.  Return the register set name.
+                return reg_set->name;
+            }
+        }
+    }
+
+    // Didn't find it.
+    return nullptr;
 }
 
 uint64_t
@@ -210,7 +239,7 @@ RegisterContextNativeThread::WriteRegisterFromUnsigned (const RegisterInfo *reg_
 {
     assert (reg_info);
     if (!reg_info)
-        return Error ("reg_info is NULL");
+        return Error ("reg_info is nullptr");
 
     RegisterValue value;
     if (!value.SetUInt(uval, reg_info->byte_size))
@@ -317,7 +346,7 @@ RegisterContextNativeThread::ReadRegisterValueFromMemory (
     RegisterValue &reg_value)
 {
     Error error;
-    if (reg_info == NULL)
+    if (reg_info == nullptr)
     {
         error.SetErrorString ("invalid register info argument.");
         return error;

@@ -29,6 +29,7 @@
 #include "lldb/Host/TimeValue.h"
 #include "lldb/Target/Platform.h"
 #include "lldb/Target/Process.h"
+#include "lldb/Target/RegisterContextNativeThread.h"
 #include "../../../Host/common/NativeProcessProtocol.h"
 #include "../../../Host/common/NativeThreadProtocol.h"
 
@@ -307,6 +308,10 @@ GDBRemoteCommunicationServer::GetPacketAndSendResponse (uint32_t timeout_usec,
             
         case StringExtractorGDBRemote::eServerPacketType_vFile_unlink:
             packet_result = Handle_vFile_unlink (packet);
+            break;
+
+        case StringExtractorGDBRemote::eServerPacketType_qRegisterInfo:
+            packet_result = Handle_qRegisterInfo (packet);
             break;
         }
     }
@@ -2394,6 +2399,145 @@ GDBRemoteCommunicationServer::Handle_vFile_MD5 (StringExtractorGDBRemote &packet
         return SendPacketNoLock(response.GetData(), response.GetSize());
     }
     return SendErrorResponse(25);
+}
+
+GDBRemoteCommunication::PacketResult
+GDBRemoteCommunicationServer::Handle_qRegisterInfo (StringExtractorGDBRemote &packet)
+{
+    // Ensure we're llgs.
+    if (!IsGdbServer())
+        return SendUnimplementedResponse("GDBRemoteCommunicationServer::Handle_qRegisterInfo() unimplemented");
+
+    // Fail if we don't have a current process.
+    if (!m_debugged_process_sp || (m_debugged_process_sp->GetID () == LLDB_INVALID_PROCESS_ID))
+        return SendErrorResponse (68);
+
+    // Ensure we have a thread.
+    NativeThreadProtocolSP thread_sp (m_debugged_process_sp->GetThreadAtIndex (0));
+    if (!thread_sp)
+        return SendErrorResponse (69);
+
+    // Get the register context for the first thread.
+    RegisterContextNativeThreadSP reg_context_sp (thread_sp->GetRegisterContext ());
+    if (!reg_context_sp)
+        return SendErrorResponse (70);
+
+    // Parse out the register number from the request.
+    packet.SetFilePos (strlen("qRegisterInfo"));
+    const uint32_t reg_index = packet.GetU32(std::numeric_limits<uint32_t>::max());
+    if (reg_index == std::numeric_limits<uint32_t>::max())
+        return SendErrorResponse (71);
+
+    // Return the end of registers response if we've iterated one past the end of the register set.
+    if (reg_index >= reg_context_sp->GetRegisterCount ())
+        return SendErrorResponse (45);
+
+    const RegisterInfo *reg_info = reg_context_sp->GetRegisterInfoAtIndex(reg_index);
+    if (!reg_info)
+        return SendErrorResponse (45);
+
+    // Build the reginfos response.
+    StreamGDBRemote response;
+
+    response.PutCString ("name:");
+    response.PutCString (reg_info->name);
+    response.PutChar (';');
+
+    if (reg_info->alt_name && reg_info->alt_name[0])
+    {
+        response.PutCString ("alt-name:");
+        response.PutCString (reg_info->alt_name);
+        response.PutChar (';');
+    }
+
+    response.Printf ("bitsize:%" PRIu32 ";offset:%" PRIu32 ";", reg_info->byte_size * 8, reg_info->byte_offset);
+
+    switch (reg_info->encoding)
+    {
+        case eEncodingUint:    response.PutCString ("encoding:uint;"); break;
+        case eEncodingSint:    response.PutCString ("encoding:sint;"); break;
+        case eEncodingIEEE754: response.PutCString ("encoding:ieee754;"); break;
+        case eEncodingVector:  response.PutCString ("encoding:vector;"); break;
+        default: break;
+    }
+
+    response.PutCString ("format:");
+    switch (reg_info->format)
+    {
+        case eFormatBinary:          response.PutCString ("format:binary;"); break;
+        case eFormatDecimal:         response.PutCString ("format:decimal;"); break;
+        case eFormatHex:             response.PutCString ("format:hex;"); break;
+        case eFormatFloat:           response.PutCString ("format:float;"); break;
+        case eFormatVectorOfSInt8:   response.PutCString ("format:vector-sint8;"); break;
+        case eFormatVectorOfUInt8:   response.PutCString ("format:vector-uint8;"); break;
+        case eFormatVectorOfSInt16:  response.PutCString ("format:vector-sint16;"); break;
+        case eFormatVectorOfUInt16:  response.PutCString ("format:vector-uint16;"); break;
+        case eFormatVectorOfSInt32:  response.PutCString ("format:vector-sint32;"); break;
+        case eFormatVectorOfUInt32:  response.PutCString ("format:vector-uint32;"); break;
+        case eFormatVectorOfFloat32: response.PutCString ("format:vector-float32;"); break;
+        case eFormatVectorOfUInt128: response.PutCString ("format:vector-uint128;"); break;
+        default: break;
+    };
+
+    const char *const register_set_name = reg_context_sp->GetRegisterSetNameForRegisterAtIndex(reg_index);
+    if (register_set_name)
+    {
+        response.PutCString ("set:");
+        response.PutCString (register_set_name);
+        response.PutChar (';');
+    }
+
+    if (reg_info->kinds[RegisterKind::eRegisterKindGCC] != LLDB_INVALID_REGNUM)
+        response.Printf ("gcc:%" PRIu32 ";", reg_info->kinds[RegisterKind::eRegisterKindGCC]);
+
+    if (reg_info->kinds[RegisterKind::eRegisterKindDWARF] != LLDB_INVALID_REGNUM)
+        response.Printf ("dwarf:%" PRIu32 ";", reg_info->kinds[RegisterKind::eRegisterKindDWARF]);
+
+    switch (reg_info->kinds[RegisterKind::eRegisterKindGeneric])
+    {
+        case LLDB_REGNUM_GENERIC_PC:     response.PutCString("generic:pc;"); break;
+        case LLDB_REGNUM_GENERIC_SP:     response.PutCString("generic:sp;"); break;
+        case LLDB_REGNUM_GENERIC_FP:     response.PutCString("generic:fp;"); break;
+        case LLDB_REGNUM_GENERIC_RA:     response.PutCString("generic:ra;"); break;
+        case LLDB_REGNUM_GENERIC_FLAGS:  response.PutCString("generic:flags;"); break;
+        case LLDB_REGNUM_GENERIC_ARG1:   response.PutCString("generic:arg1;"); break;
+        case LLDB_REGNUM_GENERIC_ARG2:   response.PutCString("generic:arg2;"); break;
+        case LLDB_REGNUM_GENERIC_ARG3:   response.PutCString("generic:arg3;"); break;
+        case LLDB_REGNUM_GENERIC_ARG4:   response.PutCString("generic:arg4;"); break;
+        case LLDB_REGNUM_GENERIC_ARG5:   response.PutCString("generic:arg5;"); break;
+        case LLDB_REGNUM_GENERIC_ARG6:   response.PutCString("generic:arg6;"); break;
+        case LLDB_REGNUM_GENERIC_ARG7:   response.PutCString("generic:arg7;"); break;
+        case LLDB_REGNUM_GENERIC_ARG8:   response.PutCString("generic:arg8;"); break;
+        default: break;
+    }
+
+    if (reg_info->value_regs && reg_info->value_regs[0] != LLDB_INVALID_REGNUM)
+    {
+        response.PutCString ("container-regs:");
+        int i = 0;
+        for (const uint32_t *reg_num = reg_info->value_regs; *reg_num != LLDB_INVALID_REGNUM; ++reg_num, ++i)
+        {
+            if (i > 0)
+                response.PutChar (',');
+            response.PutHex32 (*reg_num);
+        }
+        response.PutChar (';');
+    }
+
+    if (reg_info->invalidate_regs && reg_info->invalidate_regs[0])
+    {
+        response.PutCString ("invalidate-regs:");
+        int i = 0;
+        for (const uint32_t *reg_num = reg_info->invalidate_regs; *reg_num != LLDB_INVALID_REGNUM; ++reg_num, ++i)
+        {
+            if (i > 0)
+                response.PutChar (',');
+            response.PutHex32 (*reg_num);
+        }
+        response.PutChar (';');
+    }
+
+    return SendPacketNoLock(response.GetData(), response.GetSize());
 }
 
 void
