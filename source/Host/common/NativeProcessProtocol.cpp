@@ -145,11 +145,11 @@ NativeProcessProtocol::GetMaxWatchpoints () const
     if (!thread_sp)
     {
         if (log)
-            log->Warning ("NativeProcessProtocol::%s (): failed to find a thread to grab a RegisterContextNativeThread!", __FUNCTION__);
+            log->Warning ("NativeProcessProtocol::%s (): failed to find a thread to grab a NativeRegisterContext!", __FUNCTION__);
         return 0;
     }
 
-    RegisterContextNativeThreadSP reg_ctx_sp (thread_sp->GetRegisterContext ());
+    NativeRegisterContextSP reg_ctx_sp (thread_sp->GetRegisterContext ());
     if (!reg_ctx_sp)
     {
         if (log)

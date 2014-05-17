@@ -1,4 +1,4 @@
-//===-- RegisterContextNativeThread.cpp -------------------------*- C++ -*-===//
+//===-- NativeRegisterContex.cpp --------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -16,7 +16,7 @@ using namespace lldb_private;
 NativeRegisterContextRegisterInfo::NativeRegisterContextRegisterInfo (NativeThreadProtocol &thread,
                                                                       uint32_t concrete_frame_idx,
                                                                       RegisterInfoInterface *register_info_interface) :
-    RegisterContextNativeThread (thread, concrete_frame_idx),
+    NativeRegisterContext (thread, concrete_frame_idx),
     m_register_info_interface_up (register_info_interface)
 {
     assert (register_info_interface && "null register_info_interface");

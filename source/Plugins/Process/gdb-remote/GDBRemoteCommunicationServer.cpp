@@ -2418,7 +2418,7 @@ GDBRemoteCommunicationServer::Handle_qRegisterInfo (StringExtractorGDBRemote &pa
         return SendErrorResponse (69);
 
     // Get the register context for the first thread.
-    RegisterContextNativeThreadSP reg_context_sp (thread_sp->GetRegisterContext ());
+    NativeRegisterContextSP reg_context_sp (thread_sp->GetRegisterContext ());
     if (!reg_context_sp)
         return SendErrorResponse (70);
 

@@ -17,7 +17,7 @@
 
 namespace lldb_private
 {
-    class NativeRegisterContextRegisterInfo: public RegisterContextNativeThread
+    class NativeRegisterContextRegisterInfo: public NativeRegisterContext
     {
     public:
         ///

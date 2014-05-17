@@ -25,7 +25,7 @@ NativeThreadProtocol::NativeThreadProtocol (NativeProcessProtocol *process, lldb
 Error
 NativeThreadProtocol::ReadRegister (uint32_t reg, RegisterValue &reg_value)
 {
-    RegisterContextNativeThreadSP register_context_sp = GetRegisterContext ();
+    NativeRegisterContextSP register_context_sp = GetRegisterContext ();
     if (!register_context_sp)
         return Error ("no register context");
 
@@ -39,7 +39,7 @@ NativeThreadProtocol::ReadRegister (uint32_t reg, RegisterValue &reg_value)
 Error
 NativeThreadProtocol::WriteRegister (uint32_t reg, const RegisterValue &reg_value)
 {
-    RegisterContextNativeThreadSP register_context_sp = GetRegisterContext ();
+    NativeRegisterContextSP register_context_sp = GetRegisterContext ();
     if (!register_context_sp)
         return Error ("no register context");
 
@@ -53,7 +53,7 @@ NativeThreadProtocol::WriteRegister (uint32_t reg, const RegisterValue &reg_valu
 Error
 NativeThreadProtocol::SaveAllRegisters (lldb::DataBufferSP &data_sp)
 {
-    RegisterContextNativeThreadSP register_context_sp = GetRegisterContext ();
+    NativeRegisterContextSP register_context_sp = GetRegisterContext ();
     if (!register_context_sp)
         return Error ("no register context");
     return register_context_sp->WriteAllRegisterValues (data_sp);
@@ -62,7 +62,7 @@ NativeThreadProtocol::SaveAllRegisters (lldb::DataBufferSP &data_sp)
 Error
 NativeThreadProtocol::RestoreAllRegisters (lldb::DataBufferSP &data_sp)
 {
-    RegisterContextNativeThreadSP register_context_sp = GetRegisterContext ();
+    NativeRegisterContextSP register_context_sp = GetRegisterContext ();
     if (!register_context_sp)
         return Error ("no register context");
     return register_context_sp->ReadAllRegisterValues (data_sp);

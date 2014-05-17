@@ -1,4 +1,4 @@
-//===-- RegisterContextNativeThread.h ---------------------------*- C++ -*-===//
+//===-- NativeRegisterContext.h ---------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,8 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef liblldb_RegisterContextNativeThread_h_
-#define liblldb_RegisterContextNativeThread_h_
+#ifndef liblldb_NativeRegisterContext_h_
+#define liblldb_NativeRegisterContext_h_
 
 // C Includes
 // C++ Includes
@@ -20,17 +20,17 @@ namespace lldb_private {
 
 class NativeThreadProtocol;
 
-class RegisterContextNativeThread :
+class NativeRegisterContext:
     public std::enable_shared_from_this<RegisterContext>
 {
 public:
     //------------------------------------------------------------------
     // Constructors and Destructors
     //------------------------------------------------------------------
-    RegisterContextNativeThread (NativeThreadProtocol &thread, uint32_t concrete_frame_idx);
+    NativeRegisterContext (NativeThreadProtocol &thread, uint32_t concrete_frame_idx);
 
     virtual
-    ~RegisterContextNativeThread ();
+    ~NativeRegisterContext ();
 
     // void
     // InvalidateIfNeeded (bool force);
@@ -218,9 +218,9 @@ private:
     //------------------------------------------------------------------
     // For RegisterContext only
     //------------------------------------------------------------------
-    DISALLOW_COPY_AND_ASSIGN (RegisterContextNativeThread);
+    DISALLOW_COPY_AND_ASSIGN (NativeRegisterContext);
 };
 
 } // namespace lldb_private
 
-#endif  // liblldb_RegisterContextNativeThread_h_
+#endif  // liblldb_NativeRegisterContext_h_

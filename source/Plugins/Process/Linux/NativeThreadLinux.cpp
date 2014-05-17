@@ -78,7 +78,7 @@ NativeThreadLinux::GetStopReason (ThreadStopInfo &stop_info)
     }
 }
 
-lldb_private::RegisterContextNativeThreadSP
+lldb_private::NativeRegisterContextSP
 NativeThreadLinux::GetRegisterContext ()
 {
     // Return the register context if we already created it.
@@ -89,11 +89,11 @@ NativeThreadLinux::GetRegisterContext ()
     RegisterInfoInterface *reg_interface = nullptr;
     NativeProcessProtocolSP m_process_sp = m_process_wp.lock ();
     if (!m_process_sp)
-        return RegisterContextNativeThreadSP ();
+        return NativeRegisterContextSP ();
 
     ArchSpec target_arch;
     if (!m_process_sp->GetArchitecture (target_arch))
-        return RegisterContextNativeThreadSP ();
+        return NativeRegisterContextSP ();
 
     switch (target_arch.GetTriple().getOS())
     {
@@ -125,7 +125,7 @@ NativeThreadLinux::GetRegisterContext ()
 
     assert(reg_interface && "OS or CPU not supported!");
     if (!reg_interface)
-        return RegisterContextNativeThreadSP ();
+        return NativeRegisterContextSP ();
 
     // Now create the register context.
 #if 0

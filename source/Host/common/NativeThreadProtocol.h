@@ -37,7 +37,7 @@ namespace lldb_private
         virtual lldb::StateType
         GetState () = 0;
 
-        virtual RegisterContextNativeThreadSP
+        virtual NativeRegisterContextSP
         GetRegisterContext () = 0;
 
         virtual Error

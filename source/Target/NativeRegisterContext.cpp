@@ -1,4 +1,4 @@
-//===-- RegisterContextNativeThread.cpp -------------------------*- C++ -*-===//
+//===-- NativeRegisterContext.cpp -------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -22,7 +22,7 @@
 using namespace lldb;
 using namespace lldb_private;
 
-RegisterContextNativeThread::RegisterContextNativeThread (NativeThreadProtocol &thread, uint32_t concrete_frame_idx) :
+NativeRegisterContext::NativeRegisterContext (NativeThreadProtocol &thread, uint32_t concrete_frame_idx) :
     m_thread (thread),
     m_concrete_frame_idx (concrete_frame_idx)
 {
@@ -31,13 +31,13 @@ RegisterContextNativeThread::RegisterContextNativeThread (NativeThreadProtocol &
 //----------------------------------------------------------------------
 // Destructor
 //----------------------------------------------------------------------
-RegisterContextNativeThread::~RegisterContextNativeThread()
+NativeRegisterContext::~NativeRegisterContext()
 {
 }
 
 // FIXME revisit invalidation, process stop ids, etc.
 // void
-// RegisterContextNativeThread::InvalidateIfNeeded (bool force)
+// NativeRegisterContext::InvalidateIfNeeded (bool force)
 // {
 //     ProcessSP process_sp (m_thread.GetProcess());
 //     bool invalidate = force;
@@ -60,7 +60,7 @@ RegisterContextNativeThread::~RegisterContextNativeThread()
 
 
 const RegisterInfo *
-RegisterContextNativeThread::GetRegisterInfoByName (const char *reg_name, uint32_t start_idx)
+NativeRegisterContext::GetRegisterInfoByName (const char *reg_name, uint32_t start_idx)
 {
     if (reg_name && reg_name[0])
     {
@@ -80,7 +80,7 @@ RegisterContextNativeThread::GetRegisterInfoByName (const char *reg_name, uint32
 }
 
 const RegisterInfo *
-RegisterContextNativeThread::GetRegisterInfo (uint32_t kind, uint32_t num)
+NativeRegisterContext::GetRegisterInfo (uint32_t kind, uint32_t num)
 {
     const uint32_t reg_num = ConvertRegisterKindToRegisterNumber(kind, num);
     if (reg_num == LLDB_INVALID_REGNUM)
@@ -89,7 +89,7 @@ RegisterContextNativeThread::GetRegisterInfo (uint32_t kind, uint32_t num)
 }
 
 const char *
-RegisterContextNativeThread::GetRegisterName (uint32_t reg)
+NativeRegisterContext::GetRegisterName (uint32_t reg)
 {
     const RegisterInfo * reg_info = GetRegisterInfoAtIndex(reg);
     if (reg_info)
@@ -98,7 +98,7 @@ RegisterContextNativeThread::GetRegisterName (uint32_t reg)
 }
 
 const char*
-RegisterContextNativeThread::GetRegisterSetNameForRegisterAtIndex (uint32_t reg_index) const
+NativeRegisterContext::GetRegisterSetNameForRegisterAtIndex (uint32_t reg_index) const
 {
     const RegisterInfo *const reg_info = GetRegisterInfoAtIndex(reg_index);
     if (!reg_info)
@@ -127,14 +127,14 @@ RegisterContextNativeThread::GetRegisterSetNameForRegisterAtIndex (uint32_t reg_
 }
 
 uint64_t
-RegisterContextNativeThread::GetPC (uint64_t fail_value)
+NativeRegisterContext::GetPC (uint64_t fail_value)
 {
     uint32_t reg = ConvertRegisterKindToRegisterNumber (eRegisterKindGeneric, LLDB_REGNUM_GENERIC_PC);
     return ReadRegisterAsUnsigned (reg, fail_value);
 }
 
 Error
-RegisterContextNativeThread::SetPC (uint64_t pc)
+NativeRegisterContext::SetPC (uint64_t pc)
 {
     uint32_t reg = ConvertRegisterKindToRegisterNumber (eRegisterKindGeneric, LLDB_REGNUM_GENERIC_PC);
     return WriteRegisterFromUnsigned (reg, pc);
@@ -151,7 +151,7 @@ RegisterContextNativeThread::SetPC (uint64_t pc)
 }
 
 // bool
-// RegisterContextNativeThread::SetPC(Address addr)
+// NativeRegisterContext::SetPC(Address addr)
 // {
 //     TargetSP target_sp = m_thread.CalculateTarget();
 //     Target *target = target_sp.get();
@@ -164,42 +164,42 @@ RegisterContextNativeThread::SetPC (uint64_t pc)
 // }
 
 uint64_t
-RegisterContextNativeThread::GetSP (uint64_t fail_value)
+NativeRegisterContext::GetSP (uint64_t fail_value)
 {
     uint32_t reg = ConvertRegisterKindToRegisterNumber (eRegisterKindGeneric, LLDB_REGNUM_GENERIC_SP);
     return ReadRegisterAsUnsigned (reg, fail_value);
 }
 
 Error
-RegisterContextNativeThread::SetSP (uint64_t sp)
+NativeRegisterContext::SetSP (uint64_t sp)
 {
     uint32_t reg = ConvertRegisterKindToRegisterNumber (eRegisterKindGeneric, LLDB_REGNUM_GENERIC_SP);
     return WriteRegisterFromUnsigned (reg, sp);
 }
 
 uint64_t
-RegisterContextNativeThread::GetFP (uint64_t fail_value)
+NativeRegisterContext::GetFP (uint64_t fail_value)
 {
     uint32_t reg = ConvertRegisterKindToRegisterNumber (eRegisterKindGeneric, LLDB_REGNUM_GENERIC_FP);
     return ReadRegisterAsUnsigned (reg, fail_value);
 }
 
 Error
-RegisterContextNativeThread::SetFP (uint64_t fp)
+NativeRegisterContext::SetFP (uint64_t fp)
 {
     uint32_t reg = ConvertRegisterKindToRegisterNumber (eRegisterKindGeneric, LLDB_REGNUM_GENERIC_FP);
     return WriteRegisterFromUnsigned (reg, fp);
 }
 
 uint64_t
-RegisterContextNativeThread::GetReturnAddress (uint64_t fail_value)
+NativeRegisterContext::GetReturnAddress (uint64_t fail_value)
 {
     uint32_t reg = ConvertRegisterKindToRegisterNumber (eRegisterKindGeneric, LLDB_REGNUM_GENERIC_RA);
     return ReadRegisterAsUnsigned (reg, fail_value);
 }
 
 uint64_t
-RegisterContextNativeThread::GetFlags (uint64_t fail_value)
+NativeRegisterContext::GetFlags (uint64_t fail_value)
 {
     uint32_t reg = ConvertRegisterKindToRegisterNumber (eRegisterKindGeneric, LLDB_REGNUM_GENERIC_FLAGS);
     return ReadRegisterAsUnsigned (reg, fail_value);
@@ -207,7 +207,7 @@ RegisterContextNativeThread::GetFlags (uint64_t fail_value)
 
 
 uint64_t
-RegisterContextNativeThread::ReadRegisterAsUnsigned (uint32_t reg, uint64_t fail_value)
+NativeRegisterContext::ReadRegisterAsUnsigned (uint32_t reg, uint64_t fail_value)
 {
     if (reg != LLDB_INVALID_REGNUM)
         return ReadRegisterAsUnsigned (GetRegisterInfoAtIndex (reg), fail_value);
@@ -215,7 +215,7 @@ RegisterContextNativeThread::ReadRegisterAsUnsigned (uint32_t reg, uint64_t fail
 }
 
 uint64_t
-RegisterContextNativeThread::ReadRegisterAsUnsigned (const RegisterInfo *reg_info, uint64_t fail_value)
+NativeRegisterContext::ReadRegisterAsUnsigned (const RegisterInfo *reg_info, uint64_t fail_value)
 {
     if (reg_info)
     {
@@ -227,15 +227,15 @@ RegisterContextNativeThread::ReadRegisterAsUnsigned (const RegisterInfo *reg_inf
 }
 
 Error
-RegisterContextNativeThread::WriteRegisterFromUnsigned (uint32_t reg, uint64_t uval)
+NativeRegisterContext::WriteRegisterFromUnsigned (uint32_t reg, uint64_t uval)
 {
     if (reg == LLDB_INVALID_REGNUM)
-        return Error ("RegisterContextNativeThread::%s (): reg is invalid", __FUNCTION__);
+        return Error ("NativeRegisterContext::%s (): reg is invalid", __FUNCTION__);
     return WriteRegisterFromUnsigned (GetRegisterInfoAtIndex (reg), uval);
 }
 
 Error
-RegisterContextNativeThread::WriteRegisterFromUnsigned (const RegisterInfo *reg_info, uint64_t uval)
+NativeRegisterContext::WriteRegisterFromUnsigned (const RegisterInfo *reg_info, uint64_t uval)
 {
     assert (reg_info);
     if (!reg_info)
@@ -249,7 +249,7 @@ RegisterContextNativeThread::WriteRegisterFromUnsigned (const RegisterInfo *reg_
 }
 
 // bool
-// RegisterContextNativeThread::CopyFromRegisterContext (lldb::RegisterContextSP context)
+// NativeRegisterContext::CopyFromRegisterContext (lldb::RegisterContextSP context)
 // {
 //     uint32_t num_register_sets = context->GetRegisterSetCount();
 //     // We don't know that two threads have the same register context, so require the threads to be the same.
@@ -290,56 +290,56 @@ RegisterContextNativeThread::WriteRegisterFromUnsigned (const RegisterInfo *reg_
 // }
 
 lldb::tid_t
-RegisterContextNativeThread::GetThreadID() const
+NativeRegisterContext::GetThreadID() const
 {
     return m_thread.GetID();
 }
 
 uint32_t
-RegisterContextNativeThread::NumSupportedHardwareBreakpoints ()
+NativeRegisterContext::NumSupportedHardwareBreakpoints ()
 {
     return 0;
 }
 
 uint32_t
-RegisterContextNativeThread::SetHardwareBreakpoint (lldb::addr_t addr, size_t size)
+NativeRegisterContext::SetHardwareBreakpoint (lldb::addr_t addr, size_t size)
 {
     return LLDB_INVALID_INDEX32;
 }
 
 bool
-RegisterContextNativeThread::ClearHardwareBreakpoint (uint32_t hw_idx)
+NativeRegisterContext::ClearHardwareBreakpoint (uint32_t hw_idx)
 {
     return false;
 }
 
 
 uint32_t
-RegisterContextNativeThread::NumSupportedHardwareWatchpoints ()
+NativeRegisterContext::NumSupportedHardwareWatchpoints ()
 {
     return 0;
 }
 
 uint32_t
-RegisterContextNativeThread::SetHardwareWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags)
+NativeRegisterContext::SetHardwareWatchpoint (lldb::addr_t addr, size_t size, uint32_t watch_flags)
 {
     return LLDB_INVALID_INDEX32;
 }
 
 bool
-RegisterContextNativeThread::ClearHardwareWatchpoint (uint32_t hw_index)
+NativeRegisterContext::ClearHardwareWatchpoint (uint32_t hw_index)
 {
     return false;
 }
 
 bool
-RegisterContextNativeThread::HardwareSingleStep (bool enable)
+NativeRegisterContext::HardwareSingleStep (bool enable)
 {
     return false;
 }
 
 Error
-RegisterContextNativeThread::ReadRegisterValueFromMemory (
+NativeRegisterContext::ReadRegisterValueFromMemory (
     const RegisterInfo *reg_info,
     lldb::addr_t src_addr,
     lldb::addr_t src_len,
@@ -429,7 +429,7 @@ RegisterContextNativeThread::ReadRegisterValueFromMemory (
 }
 
 Error
-RegisterContextNativeThread::WriteRegisterValueToMemory (
+NativeRegisterContext::WriteRegisterValueToMemory (
     const RegisterInfo *reg_info,
     lldb::addr_t dst_addr,
     lldb::addr_t dst_len,
@@ -487,38 +487,38 @@ RegisterContextNativeThread::WriteRegisterValueToMemory (
 }
 
 // bool
-// RegisterContextNativeThread::ReadAllRegisterValues (lldb_private::RegisterCheckpoint &reg_checkpoint)
+// NativeRegisterContext::ReadAllRegisterValues (lldb_private::RegisterCheckpoint &reg_checkpoint)
 // {
 //     return ReadAllRegisterValues(reg_checkpoint.GetData());
 // }
 
 // bool
-// RegisterContextNativeThread::WriteAllRegisterValues (const lldb_private::RegisterCheckpoint &reg_checkpoint)
+// NativeRegisterContext::WriteAllRegisterValues (const lldb_private::RegisterCheckpoint &reg_checkpoint)
 // {
 //     return WriteAllRegisterValues(reg_checkpoint.GetData());
 // }
 
 // TargetSP
-// RegisterContextNativeThread::CalculateTarget ()
+// NativeRegisterContext::CalculateTarget ()
 // {
 //     return m_thread.CalculateTarget();
 // }
 
 
 // ProcessSP
-// RegisterContextNativeThread::CalculateProcess ()
+// NativeRegisterContext::CalculateProcess ()
 // {
 //     return m_thread.CalculateProcess ();
 // }
 
 // ThreadSP
-// RegisterContextNativeThread::CalculateThread ()
+// NativeRegisterContext::CalculateThread ()
 // {
 //     return m_thread.shared_from_this();
 // }
 
 // StackFrameSP
-// RegisterContextNativeThread::CalculateStackFrame ()
+// NativeRegisterContext::CalculateStackFrame ()
 // {
 //     // Register contexts might belong to many frames if we have inlined 
 //     // functions inside a frame since all inlined functions share the
@@ -527,14 +527,14 @@ RegisterContextNativeThread::WriteRegisterValueToMemory (
 // }
 
 // void
-// RegisterContextNativeThread::CalculateExecutionContext (ExecutionContext &exe_ctx)
+// NativeRegisterContext::CalculateExecutionContext (ExecutionContext &exe_ctx)
 // {
 //     m_thread.CalculateExecutionContext (exe_ctx);
 // }
 
 
 // bool
-// RegisterContextNativeThread::ConvertBetweenRegisterKinds (int source_rk, uint32_t source_regnum, int target_rk, uint32_t& target_regnum)
+// NativeRegisterContext::ConvertBetweenRegisterKinds (int source_rk, uint32_t source_regnum, int target_rk, uint32_t& target_regnum)
 // {
 //     const uint32_t num_registers = GetRegisterCount();
 //     for (uint32_t reg = 0; reg < num_registers; ++reg)
