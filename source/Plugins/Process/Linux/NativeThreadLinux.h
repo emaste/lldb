@@ -36,7 +36,7 @@ namespace lldb_private
         bool
         GetStopReason (ThreadStopInfo &stop_info) override;
 
-        lldb::RegisterContextNativeThreadSP
+        RegisterContextNativeThreadSP
         GetRegisterContext () override;
 
         Error
@@ -75,6 +75,7 @@ namespace lldb_private
         // ---------------------------------------------------------------------
         lldb::StateType m_state;
         ThreadStopInfo m_stop_info;
+        RegisterContextNativeThreadSP m_reg_context_sp;
     };
 }
 

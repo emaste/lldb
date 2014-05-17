@@ -42,7 +42,7 @@ public:
     // InvalidateAllRegisters () = 0;
 
     virtual uint32_t
-    GetRegisterCount () = 0;
+    GetRegisterCount () const = 0;
 
     virtual const RegisterInfo *
     GetRegisterInfoAtIndex (uint32_t reg) const = 0;

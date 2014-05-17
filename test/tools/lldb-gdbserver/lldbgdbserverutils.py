@@ -199,7 +199,10 @@ def expect_lldb_gdbserver_replay(
                             timeout_seconds, sequence_entry.exact_payload, receive_buffer))
                 can_read, _, _ = select.select([sock], [], [], 0)
                 if can_read and sock in can_read:
-                    new_bytes = sock.recv(4096)
+                    try:
+                        new_bytes = sock.recv(4096)
+                    except:
+                        new_bytes = None
                     if new_bytes and len(new_bytes) > 0:
                         # read the next bits from the socket
                         if logger:

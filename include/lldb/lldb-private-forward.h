@@ -23,6 +23,7 @@ namespace lldb_private
     class NativeBreakpointList;
     class NativeProcessProtocol;
     class NativeThreadProtocol;
+    class RegisterContextNativeThread;
 
     // ---------------------------------------------------------------
     // SP/WP decls.
@@ -31,6 +32,7 @@ namespace lldb_private
     typedef std::shared_ptr<lldb_private::NativeProcessProtocol> NativeProcessProtocolSP;
     typedef std::weak_ptr<lldb_private::NativeProcessProtocol> NativeProcessProtocolWP;
     typedef std::shared_ptr<lldb_private::NativeThreadProtocol> NativeThreadProtocolSP;
+    typedef std::shared_ptr<lldb_private::RegisterContextNativeThread> RegisterContextNativeThreadSP;
 }
 
 #endif // #if defined(__cplusplus)

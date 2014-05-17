@@ -15,6 +15,9 @@
 #include "lldb/Host/Host.h"
 #include "lldb/lldb-enumerations.h"
 #include "lldb/lldb-private-log.h"
+#include "../Utility/RegisterInfoInterface.h"
+#include "../Utility/RegisterContextLinux_i386.h"
+#include "../Utility/RegisterContextLinux_x86_64.h"
 
 using namespace lldb;
 using namespace lldb_private;
@@ -22,7 +25,8 @@ using namespace lldb_private;
 NativeThreadLinux::NativeThreadLinux (NativeProcessLinux *process, lldb::tid_t tid) :
     NativeThreadProtocol (process, tid),
     m_state (StateType::eStateInvalid),
-    m_stop_info ()
+    m_stop_info (),
+    m_reg_context_sp ()
 {
 }
 
@@ -74,11 +78,80 @@ NativeThreadLinux::GetStopReason (ThreadStopInfo &stop_info)
     }
 }
 
-lldb::RegisterContextNativeThreadSP
+lldb_private::RegisterContextNativeThreadSP
 NativeThreadLinux::GetRegisterContext ()
 {
-    // TODO implement
-    return RegisterContextNativeThreadSP ();
+    // Return the register context if we already created it.
+    if (m_reg_context_sp)
+        return m_reg_context_sp;
+
+    // First select the appropriate RegisterInfoInterface.
+    RegisterInfoInterface *reg_interface = nullptr;
+    NativeProcessProtocolSP m_process_sp = m_process_wp.lock ();
+    if (!m_process_sp)
+        return RegisterContextNativeThreadSP ();
+
+    ArchSpec target_arch;
+    if (!m_process_sp->GetArchitecture (target_arch))
+        return RegisterContextNativeThreadSP ();
+
+    switch (target_arch.GetTriple().getOS())
+    {
+        case llvm::Triple::Linux:
+            switch (target_arch.GetMachine())
+            {
+            case llvm::Triple::x86:
+            case llvm::Triple::x86_64:
+                if (Host::GetArchitecture().GetAddressByteSize() == 4)
+                {
+                    // 32-bit hosts run with a RegisterContextLinux_i386 context.
+                    reg_interface = static_cast<RegisterInfoInterface*>(new RegisterContextLinux_i386(target_arch));
+                }
+                else
+                {
+                    assert((Host::GetArchitecture().GetAddressByteSize() == 8) && "Register setting path assumes this is a 64-bit host");
+                    // X86_64 hosts know how to work with 64-bit and 32-bit EXEs using the x86_64 register context.
+                    reg_interface = static_cast<RegisterInfoInterface*>(new RegisterContextLinux_x86_64(target_arch));
+                }
+                break;
+            default:
+                break;
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    assert(reg_interface && "OS or CPU not supported!");
+    if (!reg_interface)
+        return RegisterContextNativeThreadSP ();
+
+    // Now create the register context.
+#if 0
+    switch (target_arch.GetMachine())
+    {
+        case llvm::Triple::mips64:
+        {
+            RegisterContextPOSIXProcessMonitor_mips64 *reg_ctx = new RegisterContextPOSIXProcessMonitor_mips64(*this, 0, reg_interface);
+            m_posix_thread = reg_ctx;
+            m_reg_context_sp.reset(reg_ctx);
+            break;
+        }
+        case llvm::Triple::x86:
+        case llvm::Triple::x86_64:
+        {
+            RegisterContextPOSIXProcessMonitor_x86_64 *reg_ctx = new RegisterContextPOSIXProcessMonitor_x86_64(*this, 0, reg_interface);
+            m_posix_thread = reg_ctx;
+            m_reg_context_sp.reset(reg_ctx);
+            break;
+        }
+        default:
+            break;
+    }
+#endif
+
+    return m_reg_context_sp;
 }
 
 Error
