@@ -10,7 +10,7 @@
 #include "NativeThreadProtocol.h"
 
 #include "NativeProcessProtocol.h"
-#include "lldb/Target/RegisterContextNativeThread.h"
+#include "lldb/Target/NativeRegisterContext.h"
 #include "SoftwareBreakpoint.h"
 
 using namespace lldb;

@@ -29,7 +29,7 @@
 #include "lldb/Host/TimeValue.h"
 #include "lldb/Target/Platform.h"
 #include "lldb/Target/Process.h"
-#include "lldb/Target/RegisterContextNativeThread.h"
+#include "lldb/Target/NativeRegisterContext.h"
 #include "../../../Host/common/NativeProcessProtocol.h"
 #include "../../../Host/common/NativeThreadProtocol.h"
 

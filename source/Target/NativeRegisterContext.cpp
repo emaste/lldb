@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "lldb/Target/RegisterContextNativeThread.h"
+#include "lldb/Target/NativeRegisterContext.h"
 
 #include "lldb/Core/DataExtractor.h"
 #include "lldb/Core/RegisterValue.h"

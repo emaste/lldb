@@ -12,7 +12,7 @@
 
 #include <memory>
 
-#include "RegisterContextNativeThread.h"
+#include "NativeRegisterContext.h"
 #include "Plugins/Process/Utility/RegisterInfoInterface.h"
 
 namespace lldb_private

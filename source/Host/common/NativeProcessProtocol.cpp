@@ -13,7 +13,7 @@
 #include "lldb/Core/ArchSpec.h"
 #include "lldb/Core/Log.h"
 #include "lldb/Core/State.h"
-#include "lldb/Target/RegisterContextNativeThread.h"
+#include "lldb/Target/NativeRegisterContext.h"
 
 #include "NativeThreadProtocol.h"
 #include "SoftwareBreakpoint.h"

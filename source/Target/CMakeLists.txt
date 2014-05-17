@@ -10,6 +10,8 @@ add_lldb_library(lldbTarget
   JITLoaderList.cpp
   LanguageRuntime.cpp
   Memory.cpp
+  NativeRegisterContext.cpp
+  NativeRegisterContextRegisterInfo.cpp
   ObjCLanguageRuntime.cpp
   OperatingSystem.cpp
   PathMappingList.cpp
@@ -19,7 +21,6 @@ add_lldb_library(lldbTarget
   QueueItem.cpp
   QueueList.cpp
   RegisterContext.cpp
-  RegisterContextNativeThread.cpp
   SectionLoadHistory.cpp
   SectionLoadList.cpp
   StackFrame.cpp
