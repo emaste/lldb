@@ -619,7 +619,7 @@ class LldbGdbServerTestCase(TestBase):
         self.attach_commandline_kill_after_initial_stop()
 
     def qRegisterInfo_returns_one_valid_result(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         # Build launch args
@@ -630,7 +630,7 @@ class LldbGdbServerTestCase(TestBase):
         self.add_verified_launch_packets(launch_args)
         self.test_sequence.add_log_lines(
             ["read packet: $qRegisterInfo0#00",
-             { "direction":"send", "regex":r"^\$(.+);#\d{2}", "capture":{1:"reginfo_0"} }],
+             { "direction":"send", "regex":r"^\$(.+);#[0-9A-Fa-f]{2}", "capture":{1:"reginfo_0"} }],
             True)
 
         # Run the stream
@@ -648,7 +648,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_qRegisterInfo_returns_one_valid_result_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()

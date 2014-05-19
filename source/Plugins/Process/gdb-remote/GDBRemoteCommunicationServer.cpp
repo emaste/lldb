@@ -2461,7 +2461,6 @@ GDBRemoteCommunicationServer::Handle_qRegisterInfo (StringExtractorGDBRemote &pa
         default: break;
     }
 
-    response.PutCString ("format:");
     switch (reg_info->format)
     {
         case eFormatBinary:          response.PutCString ("format:binary;"); break;
