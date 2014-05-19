@@ -15,9 +15,10 @@
 #include "lldb/Host/Host.h"
 #include "lldb/lldb-enumerations.h"
 #include "lldb/lldb-private-log.h"
-#include "../Utility/RegisterInfoInterface.h"
+#include "../Utility/NativeRegisterContextLinux_x86_64.h"
 #include "../Utility/RegisterContextLinux_i386.h"
 #include "../Utility/RegisterContextLinux_x86_64.h"
+#include "../Utility/RegisterInfoInterface.h"
 
 using namespace lldb;
 using namespace lldb_private;
@@ -109,16 +110,15 @@ NativeThreadLinux::GetRegisterContext ()
                 }
                 else
                 {
-                    assert((Host::GetArchitecture().GetAddressByteSize() == 8) && "Register setting path assumes this is a 64-bit host");
+                    assert((Host::GetArchitecture ().GetAddressByteSize () == 8) && "Register setting path assumes this is a 64-bit host");
                     // X86_64 hosts know how to work with 64-bit and 32-bit EXEs using the x86_64 register context.
-                    reg_interface = static_cast<RegisterInfoInterface*>(new RegisterContextLinux_x86_64(target_arch));
+                    reg_interface = static_cast<RegisterInfoInterface*> (new RegisterContextLinux_x86_64 (target_arch));
                 }
                 break;
             default:
                 break;
             }
             break;
-
         default:
             break;
     }
@@ -128,9 +128,9 @@ NativeThreadLinux::GetRegisterContext ()
         return NativeRegisterContextSP ();
 
     // Now create the register context.
-#if 0
     switch (target_arch.GetMachine())
     {
+#if 0
         case llvm::Triple::mips64:
         {
             RegisterContextPOSIXProcessMonitor_mips64 *reg_ctx = new RegisterContextPOSIXProcessMonitor_mips64(*this, 0, reg_interface);
@@ -138,18 +138,19 @@ NativeThreadLinux::GetRegisterContext ()
             m_reg_context_sp.reset(reg_ctx);
             break;
         }
+#endif
+#if 0
         case llvm::Triple::x86:
+#endif
         case llvm::Triple::x86_64:
         {
-            RegisterContextPOSIXProcessMonitor_x86_64 *reg_ctx = new RegisterContextPOSIXProcessMonitor_x86_64(*this, 0, reg_interface);
-            m_posix_thread = reg_ctx;
-            m_reg_context_sp.reset(reg_ctx);
+            const uint32_t concrete_frame_idx = 0;
+            m_reg_context_sp.reset (new NativeRegisterContextLinux_x86_64(*this, concrete_frame_idx, reg_interface));
             break;
         }
         default:
             break;
     }
-#endif
 
     return m_reg_context_sp;
 }

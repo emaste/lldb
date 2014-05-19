@@ -21,7 +21,7 @@ namespace lldb_private {
 class NativeThreadProtocol;
 
 class NativeRegisterContext:
-    public std::enable_shared_from_this<RegisterContext>
+    public std::enable_shared_from_this<NativeRegisterContext>
 {
 public:
     //------------------------------------------------------------------
