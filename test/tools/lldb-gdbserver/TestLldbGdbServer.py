@@ -665,7 +665,7 @@ class LldbGdbServerTestCase(TestBase):
         self.qRegisterInfo_returns_one_valid_result()
 
     def qRegisterInfo_returns_all_valid_results(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         # Build launch args.
@@ -693,14 +693,13 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_qRegisterInfo_returns_all_valid_results_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()
         self.qRegisterInfo_returns_all_valid_results()
 
     def qRegisterInfo_contains_required_generics(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         # Build launch args
@@ -743,7 +742,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_qRegisterInfo_contains_required_generics_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()
@@ -751,7 +749,7 @@ class LldbGdbServerTestCase(TestBase):
 
 
     def qRegisterInfo_contains_at_least_one_register_set(self):
-        server = self.start_server()
+        server = self.connect_to_debug_monitor()
         self.assertIsNotNone(server)
 
         # Build launch args

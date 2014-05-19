@@ -2420,21 +2420,21 @@ GDBRemoteCommunicationServer::Handle_qRegisterInfo (StringExtractorGDBRemote &pa
     // Get the register context for the first thread.
     NativeRegisterContextSP reg_context_sp (thread_sp->GetRegisterContext ());
     if (!reg_context_sp)
-        return SendErrorResponse (70);
+        return SendErrorResponse (69);
 
     // Parse out the register number from the request.
     packet.SetFilePos (strlen("qRegisterInfo"));
     const uint32_t reg_index = packet.GetU32(std::numeric_limits<uint32_t>::max());
     if (reg_index == std::numeric_limits<uint32_t>::max())
-        return SendErrorResponse (71);
+        return SendErrorResponse (69);
 
     // Return the end of registers response if we've iterated one past the end of the register set.
     if (reg_index >= reg_context_sp->GetRegisterCount ())
-        return SendErrorResponse (45);
+        return SendErrorResponse (69);
 
     const RegisterInfo *reg_info = reg_context_sp->GetRegisterInfoAtIndex(reg_index);
     if (!reg_info)
-        return SendErrorResponse (45);
+        return SendErrorResponse (69);
 
     // Build the reginfos response.
     StreamGDBRemote response;
