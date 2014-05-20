@@ -4,6 +4,7 @@ Test lldb-gdbserver operation
 import errno
 import unittest2
 import pexpect
+import platform
 import socket
 import subprocess
 import sys
@@ -787,6 +788,42 @@ class LldbGdbServerTestCase(TestBase):
         self.buildDwarf()
         self.qRegisterInfo_contains_at_least_one_register_set()
 
+
+    def qRegisterInfo_contains_avx_registers_on_linux_x86_64(self):
+        server = self.connect_to_debug_monitor()
+        self.assertIsNotNone(server)
+
+        # Build launch args
+        launch_args = [os.path.abspath('a.out')]
+
+        # Build the expected protocol stream
+        self.add_no_ack_remote_stream()
+        self.add_verified_launch_packets(launch_args)
+        self.add_register_info_collection_packets()
+
+        # Run the packet stream.
+        context = self.expect_gdbremote_sequence()
+        self.assertIsNotNone(context)
+
+        # Gather register info entries.
+        reg_infos = self.parse_register_info_packets(context)
+
+        # Collect all generics found.
+        register_sets = { reg_info['set']:1 for reg_info in reg_infos if 'set' in reg_info }
+        self.assertTrue("Advanced Vector Extensions" in register_sets)
+
+
+    @llgs_test
+    @dwarf_test
+    @unittest2.expectedFailure()
+    def test_qRegisterInfo_contains_avx_registers_on_linux_x86_64_llgs_dwarf(self):
+        # Skip this test if not Linux x86_64.
+        if platform.system() != "Linux" or platform.processor() != "x86_64":
+            self.skipTest("linux x86_64 test")
+
+        self.init_llgs_test()
+        self.buildDwarf()
+        self.qRegisterInfo_contains_avx_registers_on_linux_x86_64()
 
 if __name__ == '__main__':
     unittest2.main()
