@@ -1323,6 +1323,39 @@ WAIT_AGAIN:
 void
 NativeProcessLinux::AttachToInferior (lldb::pid_t pid, lldb_private::Error &error)
 {
+    Log *log (GetLogIfAllCategoriesSet (LIBLLDB_LOG_PROCESS));
+    if (log)
+        log->Printf ("NativeProcessLinux::%s (pid = %" PRIi64 ")", __FUNCTION__, pid);
+
+    // We can use the Host for everything except the ResolveExecutable portion.
+    PlatformSP platform_sp = Platform::GetDefaultPlatform ();
+    if (!platform_sp)
+    {
+        if (log)
+            log->Printf ("NativeProcessLinux::%s (pid = %" PRIi64 "): no default platform set", __FUNCTION__, pid);
+        error.SetErrorString ("no default platform available");
+    }
+
+    // Gather info about the process.
+    ProcessInstanceInfo process_info;
+    platform_sp->GetProcessInfo (pid, process_info);
+
+    // Resolve the executable module
+    ModuleSP exe_module_sp;
+    FileSpecList executable_search_paths (Target::GetDefaultExecutableSearchPaths());
+
+    error = platform_sp->ResolveExecutable(process_info.GetExecutableFile(),
+                                    Host::GetArchitecture(),
+                                    exe_module_sp,
+                                    executable_search_paths.GetSize() ? &executable_search_paths : NULL);
+    if (!error.Success())
+        return;
+
+    // Set the architecture to the exe architecture.
+    m_arch = exe_module_sp->GetArchitecture();
+    if (log)
+        log->Printf ("NativeProcessLinux::%s (pid = %" PRIi64 ") detected architecture %s", __FUNCTION__, pid, m_arch.GetArchitectureName ());
+
     m_pid = pid;
     SetState(eStateAttaching);
 
