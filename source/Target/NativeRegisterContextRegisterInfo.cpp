@@ -36,3 +36,9 @@ NativeRegisterContextRegisterInfo::GetRegisterInfoAtIndex (uint32_t reg_index) c
     else
         return nullptr;
 }
+
+const RegisterInfoInterface&
+NativeRegisterContextRegisterInfo::GetRegisterInfoInterface () const
+{
+    return *m_register_info_interface_up;
+}

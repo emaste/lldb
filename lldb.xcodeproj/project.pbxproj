@@ -909,6 +909,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		23173F8B192BA93F005C708F /* lldb-x86-register-enums.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "lldb-x86-register-enums.h"; path = "Utility/lldb-x86-register-enums.h"; sourceTree = "<group>"; };
 		232CB60B191E00CC00EF39FC /* NativeBreakpoint.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = NativeBreakpoint.cpp; path = source/Host/common/NativeBreakpoint.cpp; sourceTree = "<group>"; };
 		232CB60C191E00CC00EF39FC /* NativeBreakpoint.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = NativeBreakpoint.h; path = source/Host/common/NativeBreakpoint.h; sourceTree = "<group>"; };
 		232CB60D191E00CC00EF39FC /* NativeBreakpointList.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = NativeBreakpointList.cpp; path = source/Host/common/NativeBreakpointList.cpp; sourceTree = "<group>"; };
@@ -2955,6 +2956,7 @@
 				23EDE3371926AAD500F6A132 /* RegisterInfoInterface.h */,
 				239F5B2E19296DC500083917 /* NativeRegisterContextLinux_x86_64.h */,
 				239F5B3019298D4600083917 /* NativeRegisterContextLinux_x86_64.cpp */,
+				23173F8B192BA93F005C708F /* lldb-x86-register-enums.h */,
 			);
 			name = Utility;
 			sourceTree = "<group>";

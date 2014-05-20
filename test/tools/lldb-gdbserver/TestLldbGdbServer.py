@@ -770,7 +770,7 @@ class LldbGdbServerTestCase(TestBase):
         # Collect all generics found.
         register_sets = { reg_info['set']:1 for reg_info in reg_infos if 'set' in reg_info }
         self.assertTrue(len(register_sets) >= 1)
-
+        # print  "register sets found: {}".format(register_sets)
 
     @debugserver_test
     @dsym_test
@@ -782,7 +782,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_qRegisterInfo_contains_at_least_one_register_set_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()

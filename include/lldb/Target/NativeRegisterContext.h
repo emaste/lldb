@@ -54,7 +54,7 @@ public:
     GetRegisterSetCount () const = 0;
 
     virtual const RegisterSet *
-    GetRegisterSet (uint32_t reg_set) const = 0;
+    GetRegisterSet (uint32_t set_index) const = 0;
 
     virtual Error
     ReadRegister (const RegisterInfo *reg_info, RegisterValue &reg_value) = 0;

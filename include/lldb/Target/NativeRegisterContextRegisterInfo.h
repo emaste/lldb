@@ -34,6 +34,9 @@ namespace lldb_private
         const RegisterInfo *
         GetRegisterInfoAtIndex (uint32_t reg_index) const override;
 
+        const RegisterInfoInterface&
+        GetRegisterInfoInterface () const;
+
     private:
         std::unique_ptr<RegisterInfoInterface> m_register_info_interface_up;
     };

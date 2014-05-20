@@ -24,7 +24,7 @@ namespace lldb_private
         GetRegisterSetCount () const override;
 
         const RegisterSet *
-        GetRegisterSet (uint32_t reg_set) const override;
+        GetRegisterSet (uint32_t set_index) const override;
 
         Error
         ReadRegister (const RegisterInfo *reg_info, RegisterValue &reg_value) override;
@@ -40,6 +40,10 @@ namespace lldb_private
 
         uint32_t
         ConvertRegisterKindToRegisterNumber (uint32_t kind, uint32_t num) override;
+
+    private:
+
+        bool IsRegisterSetAvailable (uint32_t set_index) const;
     };
 }
 

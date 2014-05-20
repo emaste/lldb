@@ -35,7 +35,12 @@ namespace lldb_private
         virtual uint32_t
         GetRegisterCount () const = 0;
 
+        const lldb_private::ArchSpec&
+        GetTargetArchitecture() const
+            { return m_target_arch; }
+
     public:
+        // FIXME make private.
         lldb_private::ArchSpec m_target_arch;
     };
 
