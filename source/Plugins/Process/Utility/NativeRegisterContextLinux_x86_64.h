@@ -12,9 +12,12 @@
 #define lldb_NativeRegisterContextLinux_x86_64_h
 
 #include "lldb/Target/NativeRegisterContextRegisterInfo.h"
+#include "RegisterContext_x86.h"
 
 namespace lldb_private
 {
+    class NativeProcessLinux;
+
     class NativeRegisterContextLinux_x86_64 : public NativeRegisterContextRegisterInfo
     {
     public:
@@ -43,7 +46,29 @@ namespace lldb_private
 
     private:
 
+        // Private member types.
+        enum FPRType
+        {
+            eFPRTypeNotValid = 0,
+            // eFSAVE,  // TODO
+            eFPRTypeFXSAVE,
+            // eSOFT,   // TODO
+            eFPRTypeXSAVE
+        };
+
+        // Private member variables.
+        mutable FPRType m_fpr_type;
+        FPR m_fpr;
+        IOVEC m_iovec;
+
+        // Private member methods.
         bool IsRegisterSetAvailable (uint32_t set_index) const;
+
+        FPRType
+        GetFPRType () const;
+
+        bool
+        ReadFPR ();
     };
 }
 

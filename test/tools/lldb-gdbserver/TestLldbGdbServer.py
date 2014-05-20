@@ -771,7 +771,6 @@ class LldbGdbServerTestCase(TestBase):
         # Collect all generics found.
         register_sets = { reg_info['set']:1 for reg_info in reg_infos if 'set' in reg_info }
         self.assertTrue(len(register_sets) >= 1)
-        # print  "register sets found: {}".format(register_sets)
 
     @debugserver_test
     @dsym_test
@@ -815,7 +814,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_qRegisterInfo_contains_avx_registers_on_linux_x86_64_llgs_dwarf(self):
         # Skip this test if not Linux x86_64.
         if platform.system() != "Linux" or platform.processor() != "x86_64":

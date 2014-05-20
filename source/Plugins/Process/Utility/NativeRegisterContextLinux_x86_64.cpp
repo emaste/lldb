@@ -9,8 +9,12 @@
 
 #include "NativeRegisterContextLinux_x86_64.h"
 
+#include "lldb/lldb-private-forward.h"
 #include "lldb/Core/Error.h"
 #include "lldb-x86-register-enums.h"
+#include "../../../Host/common/NativeProcessProtocol.h"
+#include "../../../Host/common/NativeThreadProtocol.h"
+#include "../Linux/NativeProcessLinux.h"
 
 using namespace lldb_private;
 
@@ -303,13 +307,32 @@ namespace
 }
 
 // ----------------------------------------------------------------------------
+// Required ptrace defines.
+// ----------------------------------------------------------------------------
+
+// Support ptrace extensions even when compiled without required kernel support
+#ifndef NT_X86_XSTATE
+#define NT_X86_XSTATE 0x202
+#endif
+
+// ----------------------------------------------------------------------------
 // NativeRegisterContextLinux_x86_64 members.
 // ----------------------------------------------------------------------------
 
 NativeRegisterContextLinux_x86_64::NativeRegisterContextLinux_x86_64 (NativeThreadProtocol &native_thread, uint32_t concrete_frame_idx, RegisterInfoInterface *reg_info_interface_p) :
-    NativeRegisterContextRegisterInfo (native_thread, concrete_frame_idx, reg_info_interface_p)
+    NativeRegisterContextRegisterInfo (native_thread, concrete_frame_idx, reg_info_interface_p),
+    m_fpr_type (eFPRTypeNotValid),
+    m_fpr (),
+    m_iovec ()
 {
+    // Initialize m_iovec to point to the buffer and buffer size
+    // using the conventions of Berkeley style UIO structures, as required
+    // by PTRACE extensions.
+    m_iovec.iov_base = &m_fpr.xstate.xsave;
+    m_iovec.iov_len = sizeof(m_fpr.xstate.xsave);
 
+    // Clear out the FPR state.
+    ::memset(&m_fpr, 0, sizeof(FPR));
 }
 
 // CONSIDER after local and llgs debugging are merged, register set support can
@@ -378,14 +401,56 @@ NativeRegisterContextLinux_x86_64::ConvertRegisterKindToRegisterNumber (uint32_t
 }
 
 bool
-NativeRegisterContextLinux_x86_64::IsRegisterSetAvailable(uint32_t set_index) const
+NativeRegisterContextLinux_x86_64::IsRegisterSetAvailable (uint32_t set_index) const
 {
-    // Note: Extended register sets are assumed to be at the end of g_reg_sets...
+    // Note: Extended register sets are assumed to be at the end of g_reg_sets.
     uint32_t num_sets = k_num_register_sets - k_num_extended_register_sets;
 
-    // FIXME add in FPR type detection.
-    // if (GetFPRType() == eXSAVE) // ...and to start with AVX registers.
-    //    ++num_sets;
+    if (GetFPRType () == eFPRTypeXSAVE)
+    {
+        // AVX is the first extended register set.
+        ++num_sets;
+    }
     return (set_index < num_sets);
 }
 
+NativeRegisterContextLinux_x86_64::FPRType
+NativeRegisterContextLinux_x86_64::GetFPRType () const
+{
+    if (m_fpr_type == eFPRTypeNotValid)
+    {
+        // TODO: Use assembly to call cpuid on the inferior and query ebx or ecx.
+
+        // Try and see if AVX register retrieval works.
+        m_fpr_type = eFPRTypeXSAVE;
+        if (!const_cast<NativeRegisterContextLinux_x86_64*> (this)->ReadFPR ())
+        {
+            // Fall back to general floating point with no AVX support.
+            m_fpr_type = eFPRTypeFXSAVE;
+        }
+    }
+
+    return m_fpr_type;
+}
+
+bool
+NativeRegisterContextLinux_x86_64::ReadFPR ()
+{
+    NativeProcessProtocolSP process_sp (m_thread.GetProcess ());
+    if (!process_sp)
+        return false;
+    NativeProcessLinux *const process_p = reinterpret_cast<NativeProcessLinux*> (process_sp.get ());
+
+    const FPRType fpr_type = GetFPRType ();
+    switch (fpr_type)
+    {
+    case FPRType::eFPRTypeFXSAVE:
+        return process_p->ReadFPR (m_thread.GetID (), &m_fpr.xstate.fxsave, sizeof (m_fpr.xstate.fxsave));
+
+    case FPRType::eFPRTypeXSAVE:
+        return process_p->ReadRegisterSet (m_thread.GetID (), &m_iovec, sizeof (m_fpr.xstate.xsave), NT_X86_XSTATE);
+
+    default:
+        return false;
+    }
+}
