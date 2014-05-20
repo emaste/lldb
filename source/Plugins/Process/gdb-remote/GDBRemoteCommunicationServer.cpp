@@ -2424,8 +2424,8 @@ GDBRemoteCommunicationServer::Handle_qRegisterInfo (StringExtractorGDBRemote &pa
 
     // Parse out the register number from the request.
     packet.SetFilePos (strlen("qRegisterInfo"));
-    const uint32_t reg_index = packet.GetU32(std::numeric_limits<uint32_t>::max());
-    if (reg_index == std::numeric_limits<uint32_t>::max())
+    const uint32_t reg_index = packet.GetHexMaxU32 (false, std::numeric_limits<uint32_t>::max ());
+    if (reg_index == std::numeric_limits<uint32_t>::max ())
         return SendErrorResponse (69);
 
     // Return the end of registers response if we've iterated one past the end of the register set.
@@ -2518,7 +2518,7 @@ GDBRemoteCommunicationServer::Handle_qRegisterInfo (StringExtractorGDBRemote &pa
         {
             if (i > 0)
                 response.PutChar (',');
-            response.PutHex32 (*reg_num);
+            response.Printf ("%" PRIx32, *reg_num);
         }
         response.PutChar (';');
     }
@@ -2531,7 +2531,7 @@ GDBRemoteCommunicationServer::Handle_qRegisterInfo (StringExtractorGDBRemote &pa
         {
             if (i > 0)
                 response.PutChar (',');
-            response.PutHex32 (*reg_num);
+            response.Printf ("%" PRIx32, *reg_num);
         }
         response.PutChar (';');
     }
