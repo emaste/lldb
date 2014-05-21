@@ -313,6 +313,14 @@ GDBRemoteCommunicationServer::GetPacketAndSendResponse (uint32_t timeout_usec,
         case StringExtractorGDBRemote::eServerPacketType_qRegisterInfo:
             packet_result = Handle_qRegisterInfo (packet);
             break;
+
+        case StringExtractorGDBRemote::eServerPacketType_qfThreadInfo:
+            packet_result = Handle_qfThreadInfo (packet);
+            break;
+
+        case StringExtractorGDBRemote::eServerPacketType_qsThreadInfo:
+            packet_result = Handle_qsThreadInfo (packet);
+            break;
         }
     }
     else
@@ -1449,22 +1457,51 @@ GDBRemoteCommunicationServer::Handle_A (StringExtractorGDBRemote &packet)
 GDBRemoteCommunication::PacketResult
 GDBRemoteCommunicationServer::Handle_qC (StringExtractorGDBRemote &packet)
 {
-    lldb::pid_t pid = m_process_launch_info.GetProcessID();
     StreamString response;
-    response.Printf("QC%" PRIx64, pid);
-    if (m_is_platform)
+
+    if (IsGdbServer ())
     {
-        // If we launch a process and this GDB server is acting as a platform,
-        // then we need to clear the process launch state so we can start
-        // launching another process. In order to launch a process a bunch or
-        // packets need to be sent: environment packets, working directory,
-        // disable ASLR, and many more settings. When we launch a process we
-        // then need to know when to clear this information. Currently we are
-        // selecting the 'qC' packet as that packet which seems to make the most
-        // sense.
-        if (pid != LLDB_INVALID_PROCESS_ID)
+        // Fail if we don't have a current process.
+        if (!m_debugged_process_sp || (m_debugged_process_sp->GetID () == LLDB_INVALID_PROCESS_ID))
+            return SendErrorResponse (68);
+
+        // Make sure we set the current thread so g and p packets return
+        // the data the gdb will expect.
+        lldb::tid_t tid = m_debugged_process_sp->GetCurrentThreadID ();
+        SetCurrentThreadID (tid);
+
+        NativeThreadProtocolSP thread_sp = m_debugged_process_sp->GetCurrentThread ();
+        if (!thread_sp)
+            return SendErrorResponse (69);
+
+        response.Printf ("QC%" PRIx64, thread_sp->GetID ());
+    }
+    else
+    {
+        // NOTE: lldb should now be using qProcessInfo for process IDs.  This path here
+        // should not be used.  It is reporting process id instead of thread id.  The
+        // correct answer doesn't seem to make much sense for lldb-platform.
+        // CONSIDER: flip to "unsupported".
+        lldb::pid_t pid = m_process_launch_info.GetProcessID();
+        response.Printf("QC%" PRIx64, pid);
+
+        // this should always be platform here
+        assert (m_is_platform && "this code path should only be traversed for lldb-platform");
+
+        if (m_is_platform)
         {
-            m_process_launch_info.Clear();
+            // If we launch a process and this GDB server is acting as a platform,
+            // then we need to clear the process launch state so we can start
+            // launching another process. In order to launch a process a bunch or
+            // packets need to be sent: environment packets, working directory,
+            // disable ASLR, and many more settings. When we launch a process we
+            // then need to know when to clear this information. Currently we are
+            // selecting the 'qC' packet as that packet which seems to make the most
+            // sense.
+            if (pid != LLDB_INVALID_PROCESS_ID)
+            {
+                m_process_launch_info.Clear();
+            }
         }
     }
     return SendPacketNoLock (response.GetData(), response.GetSize());
@@ -2537,6 +2574,45 @@ GDBRemoteCommunicationServer::Handle_qRegisterInfo (StringExtractorGDBRemote &pa
     }
 
     return SendPacketNoLock(response.GetData(), response.GetSize());
+}
+
+GDBRemoteCommunication::PacketResult
+GDBRemoteCommunicationServer::Handle_qfThreadInfo (StringExtractorGDBRemote &packet)
+{
+    // Ensure we're llgs.
+    if (!IsGdbServer())
+        return SendUnimplementedResponse("GDBRemoteCommunicationServer::Handle_qfThreadInfo() unimplemented");
+
+    // Fail if we don't have a current process.
+    if (!m_debugged_process_sp || (m_debugged_process_sp->GetID () == LLDB_INVALID_PROCESS_ID))
+        return SendErrorResponse (68);
+
+    StreamGDBRemote response;
+    response.PutChar ('m');
+
+    NativeThreadProtocolSP thread_sp;
+    uint32_t thread_index;
+    for (thread_index = 0, thread_sp = m_debugged_process_sp->GetThreadAtIndex (thread_index);
+         thread_sp;
+         ++thread_index, thread_sp = m_debugged_process_sp->GetThreadAtIndex (thread_index))
+    {
+        if (thread_index > 0)
+            response.PutChar(',');
+        response.Printf ("%" PRIx64, thread_sp->GetID ());
+    }
+
+    return SendPacketNoLock(response.GetData(), response.GetSize());
+}
+
+GDBRemoteCommunication::PacketResult
+GDBRemoteCommunicationServer::Handle_qsThreadInfo (StringExtractorGDBRemote &packet)
+{
+    // Ensure we're llgs.
+    if (!IsGdbServer())
+        return SendUnimplementedResponse("GDBRemoteCommunicationServer::Handle_qsThreadInfo() unimplemented");
+
+    // FIXME for now we return the full thread list in the initial packet.
+    return SendPacketNoLock("l", 1);
 }
 
 void

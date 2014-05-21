@@ -205,8 +205,8 @@ def expect_lldb_gdbserver_replay(
                 # check for timeout
                 if time.time() > timeout_time:
                     raise Exception(
-                        'timed out after {} seconds while waiting for llgs to respond with: {}, currently received: {}'.format(
-                            timeout_seconds, sequence_entry.exact_payload, receive_buffer))
+                        'timed out after {} seconds while waiting for llgs to respond, currently received: {}'.format(
+                            timeout_seconds, receive_buffer))
                 can_read, _, _ = select.select([sock], [], [], 0)
                 if can_read and sock in can_read:
                     try:
