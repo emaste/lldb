@@ -508,9 +508,9 @@ namespace
     class ReadRegOperation : public Operation
     {
     public:
-        ReadRegOperation(lldb::tid_t tid, unsigned offset, const char *reg_name,
+        ReadRegOperation(lldb::tid_t tid, uint32_t offset, const char *reg_name,
                 RegisterValue &value, bool &result)
-            : m_tid(tid), m_offset(offset), m_reg_name(reg_name),
+            : m_tid(tid), m_offset(static_cast<uintptr_t> (offset)), m_reg_name(reg_name),
               m_value(value), m_result(result)
             { }
 
@@ -2438,7 +2438,7 @@ NativeProcessLinux::UpdateThreads ()
 }
 
 bool
-NativeProcessLinux::GetArchitecture (ArchSpec &arch)
+NativeProcessLinux::GetArchitecture (ArchSpec &arch) const
 {
     arch = m_arch;
     return true;
@@ -2874,8 +2874,8 @@ NativeProcessLinux::WriteMemory (lldb::addr_t addr, const void *buf, lldb::addr_
 }
 
 bool
-NativeProcessLinux::ReadRegisterValue(lldb::tid_t tid, unsigned offset, const char* reg_name,
-                                  unsigned size, RegisterValue &value)
+NativeProcessLinux::ReadRegisterValue(lldb::tid_t tid, uint32_t offset, const char* reg_name,
+                                  uint32_t size, RegisterValue &value)
 {
     bool result;
     ReadRegOperation op(tid, offset, reg_name, value, result);

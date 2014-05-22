@@ -1035,6 +1035,12 @@ class LldbGdbServerTestCase(TestBase):
         # Read value for each register.
         reg_index = 0
         for reg_info in reg_infos:
+            # Skip registers that don't have a register set.  For x86, these are
+            # the DRx registers, which have no LLDB-kind register number and thus
+            # cannot be read via normal NativeRegisterContext::ReadRegister(reg_info,...) calls.
+            if not "set" in reg_info:
+                continue
+
             # Clear existing packet expectations.
             self.reset_test_sequence()
 
@@ -1050,7 +1056,6 @@ class LldbGdbServerTestCase(TestBase):
             p_response = context.get("p_response")
             self.assertIsNotNone(p_response)
             self.assertEquals(len(p_response), 2 * int(reg_info["bitsize"]) / 8)
-            # print "register {} ({}): {}".format(reg_index, reg_info["name"], p_response)
 
             # Increment loop
             reg_index += 1
@@ -1067,7 +1072,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_p_returns_correct_data_size_for_each_qRegisterInfo_launch_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()
@@ -1086,7 +1090,6 @@ class LldbGdbServerTestCase(TestBase):
 
     @llgs_test
     @dwarf_test
-    @unittest2.expectedFailure()
     def test_p_returns_correct_data_size_for_each_qRegisterInfo_attach_llgs_dwarf(self):
         self.init_llgs_test()
         self.buildDwarf()

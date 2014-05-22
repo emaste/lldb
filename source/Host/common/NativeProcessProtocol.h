@@ -94,7 +94,7 @@ namespace lldb_private
         UpdateThreads () = 0;
 
         virtual bool
-        GetArchitecture (ArchSpec &arch) = 0;
+        GetArchitecture (ArchSpec &arch) const = 0;
 
         //----------------------------------------------------------------------
         // Breakpoint functions
@@ -165,7 +165,7 @@ namespace lldb_private
         }
 
         bool
-        GetByteOrder (lldb::ByteOrder &byte_order);
+        GetByteOrder (lldb::ByteOrder &byte_order) const;
 
         //----------------------------------------------------------------------
         // Exit Status

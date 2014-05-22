@@ -198,7 +198,7 @@ namespace lldb_private
         UpdateThreads () override;
 
         bool
-        GetArchitecture (ArchSpec &arch) override;
+        GetArchitecture (ArchSpec &arch) const override;
 
         Error
         SetBreakpoint (lldb::addr_t addr, size_t size, bool hardware) override;

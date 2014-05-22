@@ -1,4 +1,4 @@
-//===-- NativeRegisterContext.h ---------------------------*- C++ -*-===//
+//===-- NativeRegisterContext.h ---------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //

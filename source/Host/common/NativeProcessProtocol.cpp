@@ -122,7 +122,7 @@ NativeProcessProtocol::IsAlive () const
 }
 
 bool
-NativeProcessProtocol::GetByteOrder (lldb::ByteOrder &byte_order)
+NativeProcessProtocol::GetByteOrder (lldb::ByteOrder &byte_order) const
 {
     ArchSpec process_arch;
     if (!GetArchitecture (process_arch))

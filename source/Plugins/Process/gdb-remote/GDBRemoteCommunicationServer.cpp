@@ -321,7 +321,11 @@ GDBRemoteCommunicationServer::GetPacketAndSendResponse (uint32_t timeout_usec,
         case StringExtractorGDBRemote::eServerPacketType_qsThreadInfo:
             packet_result = Handle_qsThreadInfo (packet);
             break;
-        }
+
+        case StringExtractorGDBRemote::eServerPacketType_p:
+            packet_result = Handle_p (packet);
+            break;
+}
     }
     else
     {
@@ -2611,8 +2615,97 @@ GDBRemoteCommunicationServer::Handle_qsThreadInfo (StringExtractorGDBRemote &pac
     if (!IsGdbServer())
         return SendUnimplementedResponse("GDBRemoteCommunicationServer::Handle_qsThreadInfo() unimplemented");
 
-    // FIXME for now we return the full thread list in the initial packet.
+    // FIXME for now we return the full thread list in the initial packet and always do nothing here.
     return SendPacketNoLock("l", 1);
+}
+
+GDBRemoteCommunication::PacketResult
+GDBRemoteCommunicationServer::Handle_p (StringExtractorGDBRemote &packet)
+{
+    Log *log (GetLogIfAnyCategoriesSet(LIBLLDB_LOG_THREAD));
+
+    // Ensure we're llgs.
+    if (!IsGdbServer())
+        return SendUnimplementedResponse("GDBRemoteCommunicationServer::Handle_qsThreadInfo() unimplemented");
+
+    // Fail if we don't have a current process.
+    if (!m_debugged_process_sp || (m_debugged_process_sp->GetID () == LLDB_INVALID_PROCESS_ID))
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s failed, no process available", __FUNCTION__);
+        return SendErrorResponse (0x15);
+    }
+
+    // Ensure we have a thread.
+    NativeThreadProtocolSP thread_sp (m_debugged_process_sp->GetThreadAtIndex (0));
+    if (!thread_sp)
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s failed, no thread available (thread index 0)", __FUNCTION__);
+        return SendErrorResponse (0x15);
+    }
+
+    // Get the register context for the first thread.
+    NativeRegisterContextSP reg_context_sp (thread_sp->GetRegisterContext ());
+    if (!reg_context_sp)
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s failed, no register context available for the first thread", __FUNCTION__);
+        return SendErrorResponse (0x15);
+    }
+
+    // Parse out the register number from the request.
+    packet.SetFilePos (strlen("p"));
+    const uint32_t reg_index = packet.GetHexMaxU32 (false, std::numeric_limits<uint32_t>::max ());
+    if (reg_index == std::numeric_limits<uint32_t>::max ())
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s failed, could not parse register number from request \"%s\"", __FUNCTION__, packet.GetStringRef ().c_str ());
+        return SendErrorResponse (0x15);
+    }
+
+    // Return the end of registers response if we've iterated one past the end of the register set.
+    if (reg_index >= reg_context_sp->GetRegisterCount ())
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s failed, requested register %" PRIu32 " beyond register count %" PRIu32, __FUNCTION__, reg_index, reg_context_sp->GetRegisterCount ());
+        return SendErrorResponse (0x15);
+    }
+
+    const RegisterInfo *reg_info = reg_context_sp->GetRegisterInfoAtIndex(reg_index);
+    if (!reg_info)
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s failed, requested register %" PRIu32 " returned NULL", __FUNCTION__, reg_index);
+        return SendErrorResponse (0x15);
+    }
+
+    // Build the reginfos response.
+    StreamGDBRemote response;
+
+    // Retrieve the value
+    RegisterValue reg_value;
+    Error error = reg_context_sp->ReadRegister (reg_info, reg_value);
+    if (error.Fail ())
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s failed, read of requested register %" PRIu32 " (%s) failed: %s", __FUNCTION__, reg_index, reg_info->name, error.AsCString ());
+        return SendErrorResponse (0x15);
+    }
+
+    const uint8_t *const data = reinterpret_cast<const uint8_t*> (reg_value.GetBytes ());
+    if (!data)
+    {
+        if (log)
+            log->Printf ("GDBRemoteCommunicationServer::%s failed to get data bytes from requested register %" PRIu32, __FUNCTION__, reg_index);
+        return SendErrorResponse (0x15);
+    }
+
+    // FIXME flip as needed to get data in big/little endian format for this host.
+    for (uint32_t i = 0; i < reg_value.GetByteSize (); ++i)
+        response.PutHex8 (data[i]);
+
+    return SendPacketNoLock(response.GetData(), response.GetSize());
 }
 
 void

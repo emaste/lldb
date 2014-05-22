@@ -385,6 +385,9 @@ protected:
     PacketResult
     Handle_qsThreadInfo (StringExtractorGDBRemote &packet);
 
+    PacketResult
+    Handle_p (StringExtractorGDBRemote &packet);
+
     void
     SetCurrentThreadID (lldb::tid_t tid);
 

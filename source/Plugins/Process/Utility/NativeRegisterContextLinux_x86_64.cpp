@@ -11,6 +11,7 @@
 
 #include "lldb/lldb-private-forward.h"
 #include "lldb/Core/Error.h"
+#include "lldb/Core/RegisterValue.h"
 #include "lldb-x86-register-enums.h"
 #include "../../../Host/common/NativeProcessProtocol.h"
 #include "../../../Host/common/NativeThreadProtocol.h"
@@ -323,8 +324,56 @@ NativeRegisterContextLinux_x86_64::NativeRegisterContextLinux_x86_64 (NativeThre
     NativeRegisterContextRegisterInfo (native_thread, concrete_frame_idx, reg_info_interface_p),
     m_fpr_type (eFPRTypeNotValid),
     m_fpr (),
-    m_iovec ()
+    m_iovec (),
+    m_ymm_set (),
+    m_reg_info ()
 {
+    // Set up data about ranges of valid registers.
+    switch (reg_info_interface_p->GetTargetArchitecture ().GetMachine ())
+    {
+        case llvm::Triple::x86:
+            m_reg_info.num_registers        = k_num_registers_i386;
+            m_reg_info.num_gpr_registers    = k_num_gpr_registers_i386;
+            m_reg_info.num_fpr_registers    = k_num_fpr_registers_i386;
+            m_reg_info.num_avx_registers    = k_num_avx_registers_i386;
+            m_reg_info.last_gpr             = k_last_gpr_i386;
+            m_reg_info.first_fpr            = k_first_fpr_i386;
+            m_reg_info.last_fpr             = k_last_fpr_i386;
+            m_reg_info.first_st             = fpu_st0_i386;
+            m_reg_info.last_st              = fpu_st7_i386;
+            m_reg_info.first_mm             = fpu_mm0_i386;
+            m_reg_info.last_mm              = fpu_mm7_i386;
+            m_reg_info.first_xmm            = fpu_xmm0_i386;
+            m_reg_info.last_xmm             = fpu_xmm7_i386;
+            m_reg_info.first_ymm            = fpu_ymm0_i386;
+            m_reg_info.last_ymm             = fpu_ymm7_i386;
+            m_reg_info.first_dr             = dr0_i386;
+            m_reg_info.gpr_flags            = gpr_eflags_i386;
+            break;
+        case llvm::Triple::x86_64:
+            m_reg_info.num_registers        = k_num_registers_x86_64;
+            m_reg_info.num_gpr_registers    = k_num_gpr_registers_x86_64;
+            m_reg_info.num_fpr_registers    = k_num_fpr_registers_x86_64;
+            m_reg_info.num_avx_registers    = k_num_avx_registers_x86_64;
+            m_reg_info.last_gpr             = k_last_gpr_x86_64;
+            m_reg_info.first_fpr            = k_first_fpr_x86_64;
+            m_reg_info.last_fpr             = k_last_fpr_x86_64;
+            m_reg_info.first_st             = fpu_st0_x86_64;
+            m_reg_info.last_st              = fpu_st7_x86_64;
+            m_reg_info.first_mm             = fpu_mm0_x86_64;
+            m_reg_info.last_mm              = fpu_mm7_x86_64;
+            m_reg_info.first_xmm            = fpu_xmm0_x86_64;
+            m_reg_info.last_xmm             = fpu_xmm15_x86_64;
+            m_reg_info.first_ymm            = fpu_ymm0_x86_64;
+            m_reg_info.last_ymm             = fpu_ymm15_x86_64;
+            m_reg_info.first_dr             = dr0_x86_64;
+            m_reg_info.gpr_flags            = gpr_rflags_x86_64;
+            break;
+        default:
+            assert(false && "Unhandled target architecture.");
+            break;
+    }
+
     // Initialize m_iovec to point to the buffer and buffer size
     // using the conventions of Berkeley style UIO structures, as required
     // by PTRACE extensions.
@@ -371,10 +420,145 @@ NativeRegisterContextLinux_x86_64::GetRegisterSet (uint32_t set_index) const
 }
 
 lldb_private::Error
+NativeRegisterContextLinux_x86_64::ReadRegisterRaw (uint32_t reg_index, RegisterValue &reg_value)
+{
+    Error error;
+    const RegisterInfo *const reg_info = GetRegisterInfoAtIndex (reg_index);
+    if (!reg_info)
+    {
+        error.SetErrorStringWithFormat ("register %" PRIu32 " not found", reg_index);
+        return error;
+    }
+
+    NativeProcessProtocolSP process_sp (m_thread.GetProcess ());
+    if (!process_sp)
+    {
+        error.SetErrorString ("NativeProcessProtocol is NULL");
+        return error;
+    }
+
+    NativeProcessLinux *const process_p = reinterpret_cast<NativeProcessLinux*> (process_sp.get ());
+    if (!process_p->ReadRegisterValue(m_thread.GetID(),
+                                     reg_info->byte_offset,
+                                     reg_info->name,
+                                     reg_info->byte_size,
+                                     reg_value))
+        error.SetErrorString ("NativeProcessLinux::ReadRegisterValue() failed");
+
+    return error;
+}
+
+lldb_private::Error
 NativeRegisterContextLinux_x86_64::ReadRegister (const RegisterInfo *reg_info, RegisterValue &reg_value)
 {
-    return Error ("not implemented");
+    Error error;
+
+    if (!reg_info)
+    {
+        error.SetErrorString ("reg_info NULL");
+        return error;
+    }
+
+    const uint32_t reg = reg_info->kinds[lldb::eRegisterKindLLDB];
+    if (reg == LLDB_INVALID_REGNUM)
+    {
+        // This is likely an internal register for lldb use only and should not be directly queried.
+        error.SetErrorStringWithFormat ("register \"%s\" is an internal-only lldb register, cannot read directly", reg_info->name);
+        return error;
+    }
+
+    if (IsFPR(reg, GetFPRType()))
+    {
+        if (!ReadFPR())
+        {
+            error.SetErrorString ("failed to read floating point register");
+            return error;
+        }
+    }
+    else
+    {
+        uint32_t full_reg = reg;
+        bool is_subreg = reg_info->invalidate_regs && (reg_info->invalidate_regs[0] != LLDB_INVALID_REGNUM);
+
+        if (is_subreg)
+        {
+            // Read the full aligned 64-bit register.
+            full_reg = reg_info->invalidate_regs[0];
+        }
+
+        error = ReadRegisterRaw(full_reg, reg_value);
+
+        if (error.Success ())
+        {
+            // If our read was not aligned (for ah,bh,ch,dh), shift our returned value one byte to the right.
+            if (is_subreg && (reg_info->byte_offset & 0x1))
+                reg_value.SetUInt64(reg_value.GetAsUInt64() >> 8);
+
+            // If our return byte size was greater than the return value reg size, then
+            // use the type specified by reg_info rather than the uint64_t default
+            if (reg_value.GetByteSize() > reg_info->byte_size)
+                reg_value.SetType(reg_info);
+        }
+        return error;
+    }
+
+    if (reg_info->encoding == lldb::eEncodingVector)
+    {
+        lldb::ByteOrder byte_order = GetByteOrder();
+
+        if (byte_order != lldb::eByteOrderInvalid)
+        {
+            if (reg >= m_reg_info.first_st && reg <= m_reg_info.last_st)
+                reg_value.SetBytes(m_fpr.xstate.fxsave.stmm[reg - m_reg_info.first_st].bytes, reg_info->byte_size, byte_order);
+            if (reg >= m_reg_info.first_mm && reg <= m_reg_info.last_mm)
+                reg_value.SetBytes(m_fpr.xstate.fxsave.stmm[reg - m_reg_info.first_mm].bytes, reg_info->byte_size, byte_order);
+            if (reg >= m_reg_info.first_xmm && reg <= m_reg_info.last_xmm)
+                reg_value.SetBytes(m_fpr.xstate.fxsave.xmm[reg - m_reg_info.first_xmm].bytes, reg_info->byte_size, byte_order);
+            if (reg >= m_reg_info.first_ymm && reg <= m_reg_info.last_ymm)
+            {
+                // Concatenate ymm using the register halves in xmm.bytes and ymmh.bytes
+                if (GetFPRType() == eFPRTypeXSAVE && CopyXSTATEtoYMM(reg, byte_order))
+                    reg_value.SetBytes(m_ymm_set.ymm[reg - m_reg_info.first_ymm].bytes, reg_info->byte_size, byte_order);
+                else
+                {
+                    error.SetErrorString ("failed to copy ymm register value");
+                    return error;
+                }
+            }
+
+            if (reg_value.GetType() != RegisterValue::eTypeBytes)
+                error.SetErrorString ("write failed - type was expected to be RegisterValue::eTypeBytes");
+
+            return error;
+        }
+
+        error.SetErrorString ("byte order is invalid");
+        return error;
+    }
+
+    // Get pointer to m_fpr.xstate.fxsave variable and set the data from it.
+    assert (reg_info->byte_offset < sizeof(m_fpr));
+    uint8_t *src = (uint8_t *)&m_fpr + reg_info->byte_offset;
+    switch (reg_info->byte_size)
+    {
+        case 2:
+            reg_value.SetUInt16(*(uint16_t *)src);
+            break;
+        case 4:
+            reg_value.SetUInt32(*(uint32_t *)src);
+            break;
+        case 8:
+            reg_value.SetUInt64(*(uint64_t *)src);
+            break;
+        default:
+            assert(false && "Unhandled data size.");
+            error.SetErrorStringWithFormat ("unhandled byte size: %" PRIu32, reg_info->byte_size);
+            break;
+    }
+
+    return error;
 }
+
 
 lldb_private::Error
 NativeRegisterContextLinux_x86_64::WriteRegister (const RegisterInfo *reg_info, const RegisterValue &reg_value)
@@ -414,6 +598,24 @@ NativeRegisterContextLinux_x86_64::IsRegisterSetAvailable (uint32_t set_index) c
     return (set_index < num_sets);
 }
 
+lldb::ByteOrder
+NativeRegisterContextLinux_x86_64::GetByteOrder() const
+{
+    // Get the target process whose privileged thread was used for the register read.
+    lldb::ByteOrder byte_order = lldb::eByteOrderInvalid;
+
+    NativeProcessProtocolSP process_sp (m_thread.GetProcess ());
+    if (!process_sp)
+        return byte_order;
+
+    if (!process_sp->GetByteOrder (byte_order))
+    {
+        // FIXME log here
+    }
+
+    return byte_order;
+}
+
 NativeRegisterContextLinux_x86_64::FPRType
 NativeRegisterContextLinux_x86_64::GetFPRType () const
 {
@@ -431,6 +633,59 @@ NativeRegisterContextLinux_x86_64::GetFPRType () const
     }
 
     return m_fpr_type;
+}
+
+bool
+NativeRegisterContextLinux_x86_64::IsFPR(uint32_t reg_index) const
+{
+    return (m_reg_info.first_fpr <= reg_index && reg_index <= m_reg_info.last_fpr);
+}
+
+bool
+NativeRegisterContextLinux_x86_64::IsFPR(uint32_t reg_index, FPRType fpr_type) const
+{
+    bool generic_fpr = IsFPR(reg_index);
+
+    if (fpr_type == eFPRTypeXSAVE)
+        return generic_fpr || IsAVX(reg_index);
+    return generic_fpr;
+}
+
+bool
+NativeRegisterContextLinux_x86_64::IsAVX(uint32_t reg_index) const
+{
+    return (m_reg_info.first_ymm <= reg_index && reg_index <= m_reg_info.last_ymm);
+}
+
+bool
+NativeRegisterContextLinux_x86_64::CopyXSTATEtoYMM (uint32_t reg_index, lldb::ByteOrder byte_order)
+{
+    if (!IsAVX (reg_index))
+        return false;
+
+    if (byte_order == lldb::eByteOrderLittle)
+    {
+        ::memcpy (m_ymm_set.ymm[reg_index - m_reg_info.first_ymm].bytes,
+                 m_fpr.xstate.fxsave.xmm[reg_index - m_reg_info.first_ymm].bytes,
+                 sizeof (XMMReg));
+        ::memcpy (m_ymm_set.ymm[reg_index - m_reg_info.first_ymm].bytes + sizeof (XMMReg),
+                 m_fpr.xstate.xsave.ymmh[reg_index - m_reg_info.first_ymm].bytes,
+                 sizeof (YMMHReg));
+        return true;
+    }
+
+    if (byte_order == lldb::eByteOrderBig)
+    {
+        ::memcpy(m_ymm_set.ymm[reg_index - m_reg_info.first_ymm].bytes + sizeof (XMMReg),
+                 m_fpr.xstate.fxsave.xmm[reg_index - m_reg_info.first_ymm].bytes,
+                 sizeof (XMMReg));
+        ::memcpy(m_ymm_set.ymm[reg_index - m_reg_info.first_ymm].bytes,
+                 m_fpr.xstate.xsave.ymmh[reg_index - m_reg_info.first_ymm].bytes,
+                 sizeof (YMMHReg));
+        return true;
+    }
+    return false; // unsupported or invalid byte order
+
 }
 
 bool
@@ -454,3 +709,4 @@ NativeRegisterContextLinux_x86_64::ReadFPR ()
         return false;
     }
 }
+
