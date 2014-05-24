@@ -1786,7 +1786,7 @@ NativeProcessLinux::Attach(AttachArgs *args)
                 it->second = true;
 
                 // Create the thread, mark it as stopped.
-                NativeThreadProtocolSP thread_sp (monitor->AddThread (static_cast<lldb::tid_t> (pid)));
+                NativeThreadProtocolSP thread_sp (monitor->AddThread (static_cast<lldb::tid_t> (tid)));
                 assert (thread_sp && "AddThread() returned a nullptr");
                 reinterpret_cast<NativeThreadLinux*> (thread_sp.get ())->SetStoppedBySignal (SIGSTOP);
             }
