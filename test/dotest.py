@@ -131,7 +131,7 @@ dont_do_dwarf_test = False
 dont_do_debugserver_test = "linux" in sys.platform or "freebsd" in sys.platform
 
 # Don't do lldb-gdbserver (llgs) tests on anything except Linux.
-dont_do_llgs_test = not ("linux" in sys.platform)
+dont_do_llgs_test = not ("linux" in sys.platform or "freebsd" in sys.platform)
 
 # The blacklist is optional (-b blacklistFile) and allows a central place to skip
 # testclass's and/or testclass.testmethod's.
