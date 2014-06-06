@@ -48,7 +48,7 @@ DIRS += JITLoader/GDB
 endif
 
 ifneq (,$(filter $(HOST_OS), FreeBSD GNU/kFreeBSD))
-DIRS += Process/FreeBSD Process/POSIX
+DIRS += Process/FreeBSD Process/FreeBSD-Kernel Process/POSIX
 DIRS += Process/elf-core
 DIRS += JITLoader/GDB
 endif
