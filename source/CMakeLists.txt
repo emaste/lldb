@@ -10,6 +10,7 @@ endif ()
 if ( CMAKE_SYSTEM_NAME MATCHES "FreeBSD" )
 include_directories(
   Plugins/Process/FreeBSD
+  Plugins/Process/FreeBSD-Kernel
   Plugins/Process/POSIX
   )
 endif ()
@@ -117,6 +118,7 @@ if ( CMAKE_SYSTEM_NAME MATCHES "FreeBSD" )
   list(APPEND LLDB_USED_LIBS
     lldbHostFreeBSD
     lldbPluginProcessFreeBSD
+    lldbPluginProcessFreeBSDKernel
     lldbPluginProcessPOSIX
     lldbPluginProcessElfCore
     lldbPluginJITLoaderGDB
@@ -166,7 +168,7 @@ if (NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
 endif()
 # On FreeBSD backtrace() is provided by libexecinfo, not libc.
 if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
-  list(APPEND LLDB_SYSTEM_LIBS execinfo)
+  list(APPEND LLDB_SYSTEM_LIBS execinfo kvm)
 endif()
 
 if (NOT LLDB_DISABLE_PYTHON)
