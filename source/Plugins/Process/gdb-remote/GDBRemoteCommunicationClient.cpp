@@ -75,6 +75,7 @@ GDBRemoteCommunicationClient::GDBRemoteCommunicationClient(bool is_platform) :
     m_supports_qXfer_libraries_read (eLazyBoolCalculate),
     m_supports_qXfer_libraries_svr4_read (eLazyBoolCalculate),
     m_supports_augmented_libraries_svr4_read (eLazyBoolCalculate),
+    m_supports_jThreadExtendedInfo (eLazyBoolCalculate),
     m_supports_qProcessInfoPID (true),
     m_supports_qfProcessInfo (true),
     m_supports_qUserName (true),
@@ -493,6 +494,24 @@ GDBRemoteCommunicationClient::GetpPacketSupported (lldb::tid_t tid)
         }
     }
     return m_supports_p;
+}
+
+bool
+GDBRemoteCommunicationClient::GetThreadExtendedInfoSupported ()
+{
+    if (m_supports_jThreadExtendedInfo == eLazyBoolCalculate)
+    {
+        StringExtractorGDBRemote response;
+        m_supports_jThreadExtendedInfo = eLazyBoolNo;
+        if (SendPacketAndWaitForResponse("jThreadExtendedInfo:", response, false) == PacketResult::Success)
+        {
+            if (response.IsOKResponse())
+            {
+                m_supports_jThreadExtendedInfo = eLazyBoolYes;
+            }
+        }
+    }
+    return m_supports_jThreadExtendedInfo;
 }
 
 bool
@@ -2374,7 +2393,6 @@ GDBRemoteCommunicationClient::GetCurrentProcessInfo ()
             std::string triple;
             uint32_t pointer_byte_size = 0;
             StringExtractor extractor;
-            ByteOrder byte_order = eByteOrderInvalid;
             uint32_t num_keys_decoded = 0;
             lldb::pid_t pid = LLDB_INVALID_PROCESS_ID;
             while (response.GetNameColonValue(name, value))
@@ -2403,15 +2421,10 @@ GDBRemoteCommunicationClient::GetCurrentProcessInfo ()
                 }
                 else if (name.compare("endian") == 0)
                 {
-                    ++num_keys_decoded;
-                    if (value.compare("little") == 0)
-                        byte_order = eByteOrderLittle;
-                    else if (value.compare("big") == 0)
-                        byte_order = eByteOrderBig;
-                    else if (value.compare("pdp") == 0)
-                        byte_order = eByteOrderPDP;
-                    else
-                        --num_keys_decoded;
+                    if (value.compare("little") == 0 ||
+                        value.compare("big") == 0 ||
+                        value.compare("pdp") == 0)
+                        ++num_keys_decoded;
                 }
                 else if (name.compare("ptrsize") == 0)
                 {
