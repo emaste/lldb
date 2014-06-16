@@ -260,6 +260,7 @@ protected:
     void AddProcs(uintptr_t paddr);
 
     bool InitializeThreads();
+
     DISALLOW_COPY_AND_ASSIGN (ProcessFreeBSDKernel);
 };
 

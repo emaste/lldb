@@ -305,8 +305,6 @@ ProcessFreeBSDKernel::GetImageInfoAddress()
 lldb_private::DynamicLoader *
 ProcessFreeBSDKernel::GetDynamicLoader ()
 {
-    // if (m_dyld_ap.get() == NULL)
-    //    m_dyld_ap.reset (DynamicLoader::FindPlugin(this, m_dyld_plugin_name.IsEmpty() ? NULL : m_dyld_plugin_name.AsCString()));
     return m_dyld_ap.get();
 }
 
