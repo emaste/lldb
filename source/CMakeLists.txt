@@ -167,6 +167,7 @@ if (NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
   list(APPEND LLDB_SYSTEM_LIBS edit panel ncurses)
 endif()
 # On FreeBSD backtrace() is provided by libexecinfo, not libc.
+# And kernel core and live debugging is implemented using libkvm.
 if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
   list(APPEND LLDB_SYSTEM_LIBS execinfo kvm)
 endif()
