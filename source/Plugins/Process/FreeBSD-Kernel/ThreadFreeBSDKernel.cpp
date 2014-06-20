@@ -100,16 +100,17 @@ ThreadFreeBSDKernel::CreateRegisterContextForFrame (StackFrame *frame)
         ProcessSP process_sp (CalculateProcess());
         ProcessFreeBSDKernel * process =
                 static_cast<ProcessFreeBSDKernel *>(process_sp.get());
-         if (process)
+        if (process)
         {
             switch (process->GetTarget().GetArchitecture().GetMachine())
             {
             case llvm::Triple::x86_64:
                 {
-                    reg_interface =  new RegisterContextFreeBSD_x86_64 (target_arch);
+                    reg_interface = new RegisterContextFreeBSD_x86_64 (target_arch);
                     break;
                 }
             default:
+                // XXX we should actually return an error here instead
                 assert (!"Add CPU type support in FreeBSD Kernel");
                 break;
             }
@@ -144,6 +145,8 @@ ThreadFreeBSDKernel::CalculateStopInfo ()
         }
         else
         {
+            // XXX need to fix this up; we should be able to report panics etc.
+            // and no stop reason for threads that did not stop
             SetStopInfo(StopInfo::CreateStopReasonWithSignal (*this, SIGSTOP));
         }
         return true;

@@ -12,7 +12,7 @@
 
 // C Includes
 #include <kvm.h>
-#include <sys/proc.h>
+#include <sys/proc.h> // XXX avoid needing these
 #include <sys/cpuset.h>
 
 // C++ Includes

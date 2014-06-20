@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 // C Includes
+// XXX Remove unneeded includes.
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -45,6 +46,10 @@ using namespace lldb;
 using namespace lldb_private;
 
 namespace {
+    // XXX Add a reference to the source of these constants.
+    // (For kgdb I assume we just #include the header from the OS.  For LLDB
+    // we will want to (eventually) support cross-OS debugging and would need
+    // to provide them ourselves.
     enum {
         TDS_INACTIVE = 0x0,
         TDS_INHIBITED,
@@ -64,6 +69,9 @@ namespace {
 
         static ConstString
         GetSettingName ()
+//                    ^ XXX As an aside I really hate this aspect of LLDB style.
+//                      Since this is all our own self-contained code I'd be
+//                      fine committing it upstream without the extra space.
         {
             return ProcessFreeBSDKernel::GetPluginNameStatic();
         }
@@ -116,8 +124,8 @@ ProcessFreeBSDKernel::Terminate()
 
 lldb::ProcessSP
 ProcessFreeBSDKernel::CreateInstance (Target &target,
-                            Listener &listener,
-                            const FileSpec *crash_file_path)
+                                      Listener &listener,
+                                      const FileSpec *crash_file_path)
 {
     lldb::ProcessSP process_sp;
     // Check if the target is potentially a FreeBSD kernel image
@@ -129,6 +137,9 @@ ProcessFreeBSDKernel::CreateInstance (Target &target,
         if (symtab)
         {
             std::vector<uint32_t> match_indexes;
+            // XXX this is ok for now, but we'll eventually need to make this
+            // more restrictive so that arbitrary ELF files with a kern_open
+            // symbol don't pass here.
             ConstString symbol_name ("kern_open");
             uint32_t num_matches = 0;
 
@@ -308,6 +319,7 @@ ProcessFreeBSDKernel::DidAttach ()
     if (GetID() != LLDB_INVALID_PROCESS_ID)
     {
         // TODO: figure out the register context that we will use
+        // XXX default to dumping thread
     }
 }
 
@@ -408,7 +420,7 @@ ProcessFreeBSDKernel::DoDestroy ()
 bool
 ProcessFreeBSDKernel::IsAlive ()
 {
-    return (m_kvm  != nullptr);
+    return (m_kvm != nullptr);
 }
 
 //------------------------------------------------------------------
@@ -446,6 +458,7 @@ ProcessFreeBSDKernel::DoWriteMemory (addr_t addr, const void *buf, size_t size, 
     }
 }
 
+// XXX have only one implementation, and have the other call it
 lldb::addr_t
 ProcessFreeBSDKernel::DoAllocateMemory (size_t size, uint32_t permissions, Error &error)
 {
@@ -473,6 +486,7 @@ ProcessFreeBSDKernel::DisableBreakpointSite (BreakpointSite *bp_site)
     return DisableSoftwareBreakpoint (bp_site);
 }
 
+// XXX have only one implementation, and have the other call it
 Error
 ProcessFreeBSDKernel::EnableWatchpoint (Watchpoint *wp, bool notify)
 {
@@ -504,6 +518,7 @@ ProcessFreeBSDKernel::DoSignal (int signo)
 {
     Error error;
     error.SetErrorString ("sending signals is not suppported in kdp remote debugging");
+    // XXX remove kdp reference :-)
     return error;
 }
 
@@ -596,6 +611,7 @@ bool ProcessFreeBSDKernel::InitializeThreads()
     if (m_cpusetsize != -1 && (unsigned long)m_cpusetsize <= sizeof(cpuset_t) &&
         addr != 0)
         kvm_read(m_kvm, addr, &m_stopped_cpus, m_cpusetsize);
+    // XXX you'll need stoppcbs too
 
     AddProcs(paddr);
     addr = LookUpSymbolAddressInModule(module, "zombproc");

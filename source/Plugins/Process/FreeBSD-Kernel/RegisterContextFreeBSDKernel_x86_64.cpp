@@ -6,7 +6,7 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-#include <sys/types.h>
+#include <sys/types.h> // XXX avoid needing these
 #include <machine/pcb.h>
 
 #include "lldb/Core/DataExtractor.h"
