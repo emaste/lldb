@@ -601,6 +601,8 @@ ProcessElfCore::GetArchitecture()
     ObjectFileELF *core_file = (ObjectFileELF *)(m_core_module_sp->GetObjectFile());
     ArchSpec arch;
     core_file->GetArchitecture(arch);
+    if (arch.GetTriple().getOS() == llvm::Triple::UnknownOS)
+        arch.GetTriple().setOS(m_os);
     return arch;
 }
 
