@@ -4323,7 +4323,6 @@ ClangASTContext::GetEncoding (void* type, uint64_t &count)
         case clang::Type::Builtin:
             switch (llvm::cast<clang::BuiltinType>(qual_type)->getKind())
         {
-            default: assert(0 && "Unknown builtin type!");
             case clang::BuiltinType::Void:
                 break;
                 
