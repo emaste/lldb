@@ -2212,7 +2212,6 @@ ClangASTType::GetEncoding (uint64_t &count) const
         case clang::Type::Builtin:
             switch (llvm::cast<clang::BuiltinType>(qual_type)->getKind())
         {
-            default: assert(0 && "Unknown builtin type!");
             case clang::BuiltinType::Void:
                 break;
                 
