@@ -20,7 +20,6 @@ class TestInlineStepping(TestBase):
 
     @python_api_test
     @dwarf_test
-    @expectedFailureFreeBSD('llvm.org/pr17214')
     @expectedFailureIcc # Not really a bug.  ICC combines two inlined functions.
     @expectedFailureAll("llvm.org/pr23139", oslist=["linux"], compiler="gcc", compiler_version=[">=","4.9"], archs=["i386"])
     # failed 1/365 dosep runs, (i386-clang), TestInlineStepping.py:237 failed to stop at first breakpoint in main
