@@ -59,7 +59,6 @@ class AssertingInferiorTestCase(TestBase):
         self.inferior_asserting_expr()
 
     @expectedFailurei386('llvm.org/pr17384: lldb needs to be aware of linux-vdso.so to unwind stacks properly')
-    @unittest2.expectedFailure("rdar://15367233")
     @expectedFailureWindows("llvm.org/pr21793: need to implement support for detecting assertion / abort on Windows")
     def test_inferior_asserting_expr_dwarf(self):
         """Test that the lldb expression interpreter can read from the inferior after asserting (command)."""
