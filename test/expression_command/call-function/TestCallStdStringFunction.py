@@ -27,7 +27,6 @@ class ExprCommandCallFunctionTestCase(TestBase):
         self.call_function()
 
     @dwarf_test
-    @expectedFailureFreeBSD('llvm.org/pr17807') # Fails on FreeBSD buildbot
     @expectedFailureIcc # llvm.org/pr14437, fails with ICC 13.1
     @expectedFailureDarwin(16361880) # <rdar://problem/16361880>, we get the result correctly, but fail to invoke the Summary formatter.
     def test_with_dwarf(self):
