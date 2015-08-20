@@ -24,7 +24,6 @@ class DriverBatchModeTest (TestBase):
         self.setTearDownCleanup()
         self.batch_mode ()
 
-    @unittest2.expectedFailure("<rdar://problem/18684124>, lldb doesn't reliably print the prompt when run under pexpect")
     @expectedFailureWindows("llvm.org/pr22274: need a pexpect replacement for windows")
     @dwarf_test
     def test_driver_batch_mode_with_dwarf(self):
