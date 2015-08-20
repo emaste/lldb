@@ -27,7 +27,6 @@ class ExprCommandWithTimeoutsTestCase(TestBase):
         self.buildDsym()
         self.call_function()
 
-    @expectedFailureFreeBSD("llvm.org/pr19605") # fails on buildbot
     @expectedFlakeyLinux("llvm.org/pr20275")
     @dwarf_test
     def test_with_dwarf(self):
