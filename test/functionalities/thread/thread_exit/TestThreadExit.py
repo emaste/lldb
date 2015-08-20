@@ -21,7 +21,6 @@ class ThreadExitTestCase(TestBase):
         self.thread_exit_test()
 
     @expectedFailureDarwin("llvm.org/pr15824") # thread states not properly maintained
-    @expectedFailureFreeBSD("llvm.org/pr18190") # thread states not properly maintained
     @expectedFailureWindows("llvm.org/pr24681")
     @dwarf_test
     def test_with_dwarf(self):
