@@ -21,7 +21,6 @@ class StdListDataFormatterTestCase(TestBase):
 
     @dwarf_test
     @skipIfWindows # libstdcpp not ported to Windows
-    @expectedFailureFreeBSD("llvm.org/pr20548") # fails to build on lab.llvm.org buildbot
     def test_with_dwarf_and_run_command(self):
         """Test data formatter commands."""
         self.buildDwarf()
