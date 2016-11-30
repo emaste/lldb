@@ -67,7 +67,8 @@ def do_pre_kill(process_id, runner_context, output_stream, sample_time=3):
                 returncode))
 
         with open(os.devnull, 'w') as devnull:
-            output = subprocess.check_output(['pmcstat', '-R', filename,
+            output = subprocess.check_output(['timeout', '60', 'pmcstat',
+                                              '-R', filename,
                                               '-G', '/dev/stdout'],
                                              stderr=devnull)
         output_stream.write(output)
