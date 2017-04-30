@@ -8,6 +8,7 @@ from __future__ import print_function
 import os
 import time
 import lldb
+import shutil
 from lldbsuite.test.decorators import *
 from lldbsuite.test.lldbtest import *
 from lldbsuite.test import lldbutil
@@ -26,6 +27,24 @@ class ProcessAttachTestCase(TestBase):
         """Test attach by process id"""
         self.build()
         exe = os.path.join(os.getcwd(), exe_name)
+
+        # Spawn a new process
+        popen = self.spawnSubprocess(exe)
+        self.addTearDownHook(self.cleanupSubprocesses)
+
+        self.runCmd("process attach -p " + str(popen.pid))
+
+        target = self.dbg.GetSelectedTarget()
+
+        process = target.GetProcess()
+        self.assertTrue(process, PROCESS_IS_VALID)
+
+    def test_attach_to_process_frm_different_dir_by_id(self):
+        """Test attach by process id"""
+        os.mkdir(os.path.join(os.getcwd(),'newdir'))
+        self.buildProgram('main.cpp','newdir/proc_attach')
+        exe = os.path.join(os.getcwd(), 'newdir/proc_attach')
+        self.addTearDownHook(lambda: shutil.rmtree(os.path.dirname(exe)))
 
         # Spawn a new process
         popen = self.spawnSubprocess(exe)
