@@ -44,7 +44,7 @@ class ProcessAttachTestCase(TestBase):
         os.mkdir(os.path.join(os.getcwd(),'newdir'))
         self.buildProgram('main.cpp','newdir/proc_attach')
         exe = os.path.join('.','newdir','proc_attach')
-        self.addTearDownHook(lambda: shutil.rmtree(os.path.join(os.getcwd)))
+        self.addTearDownHook(lambda: shutil.rmtree(os.path.join(os.getcwd),'newdir'))
 
         # Spawn a new process
         popen = self.spawnSubprocess(exe)
