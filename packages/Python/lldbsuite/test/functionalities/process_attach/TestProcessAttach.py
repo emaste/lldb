@@ -43,15 +43,14 @@ class ProcessAttachTestCase(TestBase):
         """Test attach by process id"""
         os.mkdir(os.path.join(os.getcwd(),'newdir'))
         self.buildProgram('main.cpp','newdir/proc_attach')
-        exe = os.path.join(os.getcwd(), 'newdir/proc_attach')
-        self.addTearDownHook(lambda: shutil.rmtree(os.path.dirname(exe)))
+        exe = os.path.join('.','newdir','proc_attach')
+        self.addTearDownHook(lambda: shutil.rmtree(os.path.join(os.getcwd)))
 
-        os.chdir('newdir')
         # Spawn a new process
-        popen = self.spawnSubprocess('./proc_attach')
-        os.chdir('..')
+        popen = self.spawnSubprocess(exe)
         self.addTearDownHook(self.cleanupSubprocesses)
 
+	os.chdir('newdir')
         self.runCmd("process attach -p " + str(popen.pid))
 
         target = self.dbg.GetSelectedTarget()
