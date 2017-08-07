@@ -16,9 +16,6 @@ class CrashingRecursiveInferiorTestCase(TestBase):
 
     mydir = TestBase.compute_mydir(__file__)
 
-    @expectedFailureAll(
-        oslist=['freebsd'],
-        bugnumber="llvm.org/pr23699 SIGSEGV is reported as exception, not signal")
     @expectedFailureAll(oslist=["windows"], bugnumber="llvm.org/pr24778")
     def test_recursive_inferior_crashing(self):
         """Test that lldb reliably catches the inferior crashing (command)."""

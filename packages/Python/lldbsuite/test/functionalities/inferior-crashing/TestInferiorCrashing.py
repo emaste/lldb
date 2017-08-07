@@ -17,9 +17,6 @@ class CrashingInferiorTestCase(TestBase):
     mydir = TestBase.compute_mydir(__file__)
 
     @expectedFailureAll(
-        oslist=['freebsd'],
-        bugnumber="llvm.org/pr23699 SIGSEGV is reported as exception, not signal")
-    @expectedFailureAll(
         oslist=["windows"],
         bugnumber="llvm.org/pr24778, This actually works, but the test relies on the output format instead of the API")
     def test_inferior_crashing(self):
